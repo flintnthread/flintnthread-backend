@@ -26,14 +26,14 @@ public class SellerServiceImpl implements SellerService {
             return "Email already registered!";
         }
 
-        if (sellerRepository.findByMobileNumber(registerDTO.getMobileNumber()).isPresent()) {
+        if (sellerRepository.findByMobileNumber(registerDTO.getMobile()).isPresent()) {
             return "Mobile number already registered!";
         }
 
         Seller seller = new Seller();
         seller.setFirstName(registerDTO.getFirstName());
         seller.setLastName(registerDTO.getLastName());
-        seller.setMobileNumber(registerDTO.getMobileNumber());
+        seller.setMobileNumber(registerDTO.getMobile());
         seller.setEmail(registerDTO.getEmail());
         seller.setPassword(registerDTO.getPassword()); // Later we encrypt
 
