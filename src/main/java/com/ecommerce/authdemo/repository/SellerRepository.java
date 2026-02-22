@@ -6,5 +6,5 @@ import java.util.Optional;
 
 public interface SellerRepository extends JpaRepository<Seller, Long> {
     Optional<Seller> findByEmail(String email);
-    Optional<Seller> findByMobileNumber(String mobileNumber);
+    Optional<Seller> findByMobileNumber(String mobile);
 }
