@@ -137,12 +137,25 @@ public class AuthServiceImpl implements AuthService {
 
         User user = userRepository.findByEmail(identifier)
                 .orElse(userRepository.findByContactNumber(identifier)
-                        .orElseThrow(() -> new RuntimeException("User not found")));
+                        .orElse(null));
 
-        user.setVerified(true);
+        if (user == null) {
 
-        if (user.getRole() == null) {
+            user = new User();
+
+            if (identifier.contains("@")) {
+                user.setEmail(identifier);
+                user.setUsername(identifier);
+            } else {
+                user.setContactNumber(identifier);
+                user.setUsername(identifier);
+            }
+
+            user.setVerified(true);
             user.setRole(Role.USER);
+
+        } else {
+            user.setVerified(true);
         }
 
         userRepository.save(user);

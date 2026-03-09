@@ -12,5 +12,7 @@ import java.util.Optional;
         Optional<User> findByEmail(String email);
 
         Optional<User> findByContactNumber(String contactNumber);
+
+        Optional<User> findByUsername(String username);
     }
 
