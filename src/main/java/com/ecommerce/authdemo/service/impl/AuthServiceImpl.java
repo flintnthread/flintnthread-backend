@@ -2,16 +2,20 @@ package com.ecommerce.authdemo.service.impl;
 
 import com.ecommerce.authdemo.dto.Enum.Role;
 import com.ecommerce.authdemo.dto.LoginRequestDTO;
-import com.ecommerce.authdemo.dto.OtpResponseDTO;
 import com.ecommerce.authdemo.dto.VerifyOtpDTO;
 import com.ecommerce.authdemo.dto.AuthResponseDTO;
 import com.ecommerce.authdemo.entity.Otp;
 import com.ecommerce.authdemo.entity.User;
+import com.ecommerce.authdemo.entity.Seller;
+import com.ecommerce.authdemo.entity.AdminUser;
 import com.ecommerce.authdemo.repository.OtpRepository;
 import com.ecommerce.authdemo.repository.UserRepository;
+import com.ecommerce.authdemo.repository.SellerRepository;
+import com.ecommerce.authdemo.repository.AdminUserRepository;
 import com.ecommerce.authdemo.security.JwtUtil;
 import com.ecommerce.authdemo.service.AuthService;
 import com.ecommerce.authdemo.util.OtpUtil;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
@@ -26,6 +30,12 @@ public class AuthServiceImpl implements AuthService {
     private UserRepository userRepository;
 
     @Autowired
+    private SellerRepository sellerRepository;
+
+    @Autowired
+    private AdminUserRepository adminUserRepository;
+
+    @Autowired
     private OtpRepository otpRepository;
 
     @Autowired
@@ -34,6 +44,7 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private OtpUtil otpUtil;
 
+    // SEND OTP
     @Override
     @Transactional
     public String sendOtp(LoginRequestDTO dto) {
@@ -53,20 +64,6 @@ public class AuthServiceImpl implements AuthService {
         }
         else {
             throw new RuntimeException("Email or Mobile required");
-        }
-
-        User user = userRepository.findByEmail(identifier)
-                .orElse(userRepository.findByContactNumber(identifier).orElse(null));
-
-        if (user == null) {
-
-            user = new User();
-            user.setEmail(dto.getEmail());
-            user.setContactNumber(dto.getMobile());
-            user.setVerified(false);
-            user.setRole(Role.USER);
-
-            userRepository.save(user);
         }
 
         Optional<Otp> existingOtp =
@@ -97,10 +94,10 @@ public class AuthServiceImpl implements AuthService {
 
         System.out.println("Generated OTP: " + otp);
 
-        // RETURN OTP
         return otp;
     }
 
+    // VERIFY OTP
     @Override
     @Transactional
     public AuthResponseDTO verifyOtp(VerifyOtpDTO dto) {
@@ -109,9 +106,11 @@ public class AuthServiceImpl implements AuthService {
 
         if (dto.getEmail() != null && !dto.getEmail().isEmpty()) {
             identifier = dto.getEmail();
-        } else if (dto.getMobile() != null && !dto.getMobile().isEmpty()) {
+        }
+        else if (dto.getMobile() != null && !dto.getMobile().isEmpty()) {
             identifier = dto.getMobile();
-        } else {
+        }
+        else {
             throw new RuntimeException("Email or Mobile required");
         }
 
@@ -135,37 +134,61 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("Invalid OTP");
         }
 
-        User user = userRepository.findByEmail(identifier)
-                .orElse(userRepository.findByContactNumber(identifier)
-                        .orElse(null));
+        Role role;
 
-        if (user == null) {
+        Optional<AdminUser> admin =
+                adminUserRepository.findByEmail(identifier);
 
-            user = new User();
+        if (admin.isPresent()) {
 
-            if (identifier.contains("@")) {
-                user.setEmail(identifier);
-                user.setUsername(identifier);
-            } else {
-                user.setContactNumber(identifier);
-                user.setUsername(identifier);
-            }
-
-            user.setVerified(true);
-            user.setRole(Role.USER);
+            role = Role.ADMIN;
 
         } else {
-            user.setVerified(true);
-        }
 
-        userRepository.save(user);
+            Optional<Seller> seller =
+                    sellerRepository.findByEmail(identifier)
+                            .or(() -> sellerRepository.findByMobileNumber(identifier));
+
+            if (seller.isPresent()) {
+
+                role = Role.SELLER;
+
+            } else {
+
+                Optional<User> user =
+                        userRepository.findByEmail(identifier)
+                                .or(() -> userRepository.findByContactNumber(identifier));
+
+                if (user.isPresent()) {
+
+                    role = Role.USER;
+
+                } else {
+
+                    User newUser = new User();
+
+                    if (identifier.contains("@")) {
+                        newUser.setEmail(identifier);
+                        newUser.setUsername(identifier);
+                    } else {
+                        newUser.setContactNumber(identifier);
+                        newUser.setUsername(identifier);
+                    }
+
+                    newUser.setVerified(true);
+                    newUser.setRole(Role.USER);
+
+                    userRepository.save(newUser);
+
+                    role = Role.USER;
+                }
+            }
+        }
 
         otpRepository.deleteByIdentifier(identifier);
 
-        String token = jwtUtil.generateToken(user);
+        String token = jwtUtil.generateToken(identifier, role.name());
 
-        return new AuthResponseDTO(token, user.getRole().name());
+        return new AuthResponseDTO(token, role.name());
     }
 }
-
-
