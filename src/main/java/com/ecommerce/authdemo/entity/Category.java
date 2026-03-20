@@ -20,6 +20,7 @@ public class Category {
     @Column(name="category_name")
     private String categoryName;
 
+
     @Column(name="category_image")
     private String image;
 

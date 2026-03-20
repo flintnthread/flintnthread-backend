@@ -8,6 +8,9 @@ import com.ecommerce.authdemo.entity.Otp;
 import com.ecommerce.authdemo.entity.User;
 import com.ecommerce.authdemo.entity.Seller;
 import com.ecommerce.authdemo.entity.AdminUser;
+import com.ecommerce.authdemo.exception.OtpExpiredException;
+import com.ecommerce.authdemo.exception.OtpNotFoundException;
+import com.ecommerce.authdemo.exception.TooManyAttemptsException;
 import com.ecommerce.authdemo.repository.OtpRepository;
 import com.ecommerce.authdemo.repository.UserRepository;
 import com.ecommerce.authdemo.repository.SellerRepository;
@@ -114,16 +117,21 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("Email or Mobile required");
         }
 
-        Otp otpEntity = otpRepository
-                .findTopByIdentifierOrderByExpiryTimeDesc(identifier)
-                .orElseThrow(() -> new RuntimeException("OTP not found"));
+        Optional<Otp> otpOptional = otpRepository.findTopByIdentifierOrderByExpiryTimeDesc(identifier);
+
+        if (otpOptional.isEmpty()) {
+            // Instead of RuntimeException, throw a custom exception or return null
+            throw new OtpNotFoundException("OTP not found or expired");
+        }
+
+        Otp otpEntity = otpOptional.get();
 
         if (otpEntity.getAttempts() >= 5) {
-            throw new RuntimeException("Too many attempts. Try again later.");
+            throw new TooManyAttemptsException("Too many attempts. Try again later.");
         }
 
         if (otpEntity.getExpiryTime().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("OTP Expired");
+            throw new OtpExpiredException("OTP expired");
         }
 
         if (!otpEntity.getOtp().equals(dto.getOtp())) {

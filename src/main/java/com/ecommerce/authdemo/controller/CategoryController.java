@@ -1,5 +1,7 @@
 package com.ecommerce.authdemo.controller;
 
+import com.ecommerce.authdemo.dto.CategoryWithSubDTO;
+import com.ecommerce.authdemo.dto.SubCategoryResponseDTO;
 import com.ecommerce.authdemo.entity.Category;
 import com.ecommerce.authdemo.dto.CategoryTreeDTO;
 import com.ecommerce.authdemo.service.CategoryService;
@@ -8,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/categories")
@@ -26,21 +29,18 @@ public class CategoryController {
     public ResponseEntity<List<Category>> getMainCategories() {
 
         List<Category> categories = categoryService.getMainCategories();
-
         return ResponseEntity.ok(categories);
     }
 
 
     /**
-     * 2️⃣ Get subcategories by parentId
+     * 2️⃣ Get subcategories from CATEGORY TABLE
      */
     @GetMapping("/{parentId}/subcategories")
     public ResponseEntity<List<Category>> getSubCategories(
             @PathVariable Long parentId) {
 
-        List<Category> categories =
-                categoryService.getSubCategories(parentId);
-
+        List<Category> categories = categoryService.getSubCategories(parentId);
         return ResponseEntity.ok(categories);
     }
 
@@ -53,35 +53,55 @@ public class CategoryController {
             @PathVariable Long id) {
 
         Category category = categoryService.getCategory(id);
-
         return ResponseEntity.ok(category);
     }
 
 
     /**
      * 4️⃣ Get FULL CATEGORY TREE
-     * Mobile apps use this to build nested category UI
+     * Used for nested category UI
      */
     @GetMapping("/tree")
     public ResponseEntity<List<CategoryTreeDTO>> getCategoryTree() {
 
-        List<CategoryTreeDTO> tree =
-                categoryService.getCategoryTree();
-
+        List<CategoryTreeDTO> tree = categoryService.getCategoryTree();
         return ResponseEntity.ok(tree);
     }
 
 
     /**
-     * 5️⃣ Search categories
+     * 5️⃣ Search only categories
      */
     @GetMapping("/search")
     public ResponseEntity<List<Category>> searchCategories(
             @RequestParam String keyword) {
 
-        List<Category> categories =
-                categoryService.searchCategories(keyword);
-
+        List<Category> categories = categoryService.searchCategories(keyword);
         return ResponseEntity.ok(categories);
+    }
+
+
+    /**
+     * 6️⃣ Get SubCategories from SUBCATEGORY TABLE
+     */
+    @GetMapping("/{categoryId}/subcategories-table")
+    public ResponseEntity<List<CategoryWithSubDTO>> getSubCategoriesFromTable(
+            @PathVariable Long categoryId) {
+
+        return ResponseEntity.ok(
+                categoryService.getSubCategoriesFromTable(categoryId)
+        );
+    }
+
+
+    /**
+     * 7️⃣ HOME SEARCH (Category + Product)
+     */
+    @GetMapping("/search-all")
+    public ResponseEntity<Map<String, Object>> searchAll(
+            @RequestParam String keyword) {
+
+        Map<String, Object> result = categoryService.searchAll(keyword);
+        return ResponseEntity.ok(result);
     }
 }

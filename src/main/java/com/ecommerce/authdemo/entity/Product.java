@@ -33,7 +33,8 @@ public class Product {
     private Long weightSlabId;
 
     // BASIC DETAILS
-    private String name;
+    @Column(name = "product_name")
+    private String productName;
 
     private String sku;
 

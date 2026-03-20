@@ -1,9 +1,15 @@
 package com.ecommerce.authdemo.service.impl;
 
-import com.ecommerce.authdemo.entity.Category;
-import com.ecommerce.authdemo.repository.CategoryRepository;
-import com.ecommerce.authdemo.service.CategoryService;
 import com.ecommerce.authdemo.dto.CategoryTreeDTO;
+import com.ecommerce.authdemo.dto.CategoryWithSubDTO;
+import com.ecommerce.authdemo.dto.SubCategoryResponseDTO;
+import com.ecommerce.authdemo.entity.Category;
+import com.ecommerce.authdemo.entity.Product;
+import com.ecommerce.authdemo.entity.SubCategory;
+import com.ecommerce.authdemo.repository.CategoryRepository;
+import com.ecommerce.authdemo.repository.ProductRepository;
+import com.ecommerce.authdemo.repository.SubCategoryRepository;
+import com.ecommerce.authdemo.service.CategoryService;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,9 +22,17 @@ import java.util.stream.Collectors;
 public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final SubCategoryRepository subCategoryRepository;
+    private final ProductRepository productRepository;
 
-    public CategoryServiceImpl(CategoryRepository categoryRepository) {
+    // Constructor Injection
+    public CategoryServiceImpl(CategoryRepository categoryRepository,
+                               SubCategoryRepository subCategoryRepository,
+                               ProductRepository productRepository) {
+
         this.categoryRepository = categoryRepository;
+        this.subCategoryRepository = subCategoryRepository;
+        this.productRepository = productRepository;
     }
 
     /**
@@ -31,11 +45,11 @@ public class CategoryServiceImpl implements CategoryService {
                 .stream()
                 .filter(c -> c.getStatus() != null && c.getStatus() == 1)
                 .sorted(Comparator.comparing(Category::getCategoryName))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**
-     * Get sub categories by parent id
+     * Get sub categories
      */
     @Override
     public List<Category> getSubCategories(Long parentId) {
@@ -48,7 +62,7 @@ public class CategoryServiceImpl implements CategoryService {
                 .stream()
                 .filter(c -> c.getStatus() != null && c.getStatus() == 1)
                 .sorted(Comparator.comparing(Category::getCategoryName))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**
@@ -84,11 +98,11 @@ public class CategoryServiceImpl implements CategoryService {
 
         return rootCategories.stream()
                 .map(category -> buildTree(category, categoryMap))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**
-     * Recursive tree builder
+     * Recursive method to build category tree
      */
     private CategoryTreeDTO buildTree(Category category,
                                       Map<Long, List<Category>> categoryMap) {
@@ -105,7 +119,7 @@ public class CategoryServiceImpl implements CategoryService {
         dto.setChildren(
                 children.stream()
                         .map(child -> buildTree(child, categoryMap))
-                        .toList()
+                        .collect(Collectors.toList())
         );
 
         return dto;
@@ -125,6 +139,60 @@ public class CategoryServiceImpl implements CategoryService {
                 .findByCategoryNameContainingIgnoreCase(keyword.trim())
                 .stream()
                 .filter(c -> c.getStatus() != null && c.getStatus() == 1)
-                .toList();
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get sub categories from SubCategory table
+     */
+    @Override
+    public List<CategoryWithSubDTO> getSubCategoriesFromTable(Long categoryId) {
+
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new RuntimeException("Category not found"));
+
+        List<SubCategory> subCategories =
+                subCategoryRepository.findByCategoryId(categoryId);
+
+        List<SubCategoryResponseDTO> subCategoryList =
+                subCategories.stream()
+                        .map(sc -> new SubCategoryResponseDTO(
+                                sc.getId(),
+                                sc.getSubcategoryName(),
+                                sc.getSubcategoryImage()
+                        ))
+                        .toList();
+
+        CategoryWithSubDTO response = new CategoryWithSubDTO();
+        response.setCategoryName(category.getCategoryName());
+        response.setSubcategories(subCategoryList);
+
+        return List.of(response);
+    }
+
+    /**
+     * Search both categories and products
+     */
+    @Override
+    public Map<String, Object> searchAll(String keyword) {
+
+        Map<String, Object> result = new HashMap<>();
+
+        if (keyword == null || keyword.trim().isEmpty()) {
+            result.put("categories", Collections.emptyList());
+            result.put("products", Collections.emptyList());
+            return result;
+        }
+
+        List<Category> categories =
+                categoryRepository.findByCategoryNameContainingIgnoreCase(keyword);
+
+        List<Product> products =
+                productRepository.findByProductNameContainingIgnoreCase(keyword);
+
+        result.put("categories", categories);
+        result.put("products", products);
+
+        return result;
     }
 }

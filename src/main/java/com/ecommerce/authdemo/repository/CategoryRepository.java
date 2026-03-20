@@ -7,13 +7,13 @@ import java.util.List;
 
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-    // main categories
+    // Main Categories
     List<Category> findByParentIdIsNull();
 
-    // subcategories
+    // Subcategories
     List<Category> findByParentId(Long parentId);
 
-    // search
-    List<Category> findByCategoryNameContainingIgnoreCase(String name);
+    // Search Categories
+    List<Category> findByCategoryNameContainingIgnoreCase(String keyword);
 
 }
