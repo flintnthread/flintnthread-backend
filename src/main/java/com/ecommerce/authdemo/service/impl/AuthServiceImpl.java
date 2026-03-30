@@ -8,17 +8,20 @@ import com.ecommerce.authdemo.entity.Otp;
 import com.ecommerce.authdemo.entity.User;
 import com.ecommerce.authdemo.entity.Seller;
 import com.ecommerce.authdemo.entity.AdminUser;
-import com.ecommerce.authdemo.exception.OtpExpiredException;
-import com.ecommerce.authdemo.exception.OtpNotFoundException;
-import com.ecommerce.authdemo.exception.TooManyAttemptsException;
+import com.ecommerce.authdemo.exception.*;
 import com.ecommerce.authdemo.repository.OtpRepository;
 import com.ecommerce.authdemo.repository.UserRepository;
 import com.ecommerce.authdemo.repository.SellerRepository;
 import com.ecommerce.authdemo.repository.AdminUserRepository;
 import com.ecommerce.authdemo.security.JwtUtil;
 import com.ecommerce.authdemo.service.AuthService;
+import com.ecommerce.authdemo.service.EmailService;
+import com.ecommerce.authdemo.service.SmsService;
 import com.ecommerce.authdemo.util.OtpUtil;
+import org.springframework.mail.MailException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
@@ -28,6 +31,9 @@ import java.util.Optional;
 
 @Service
 public class AuthServiceImpl implements AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
 
     @Autowired
     private UserRepository userRepository;
@@ -47,6 +53,12 @@ public class AuthServiceImpl implements AuthService {
     @Autowired
     private OtpUtil otpUtil;
 
+    @Autowired
+    private SmsService smsService;
+
+    @Autowired
+    private EmailService emailService;
+
     // SEND OTP
     @Override
     @Transactional
@@ -54,51 +66,63 @@ public class AuthServiceImpl implements AuthService {
 
         String identifier;
 
+        // Determine identifier (email or mobile)
         if (dto.getEmail() != null && !dto.getEmail().isEmpty()) {
             identifier = dto.getEmail();
-        }
-        else if (dto.getMobile() != null && !dto.getMobile().isEmpty()) {
+        } else if (dto.getMobile() != null && !dto.getMobile().isEmpty()) {
 
+            // Validate Indian mobile number
             if (!dto.getMobile().matches("^[6-9]\\d{9}$")) {
-                throw new RuntimeException("Invalid mobile number");
+                throw new InvalidMobileException("Invalid mobile number");
             }
 
             identifier = dto.getMobile();
-        }
-        else {
-            throw new RuntimeException("Email or Mobile required");
-        }
-
-        Optional<Otp> existingOtp =
-                otpRepository.findTopByIdentifierOrderByExpiryTimeDesc(identifier);
-
-        if (existingOtp.isPresent()) {
-
-            if (existingOtp.get()
-                    .getExpiryTime()
-                    .minusMinutes(4)
-                    .isAfter(LocalDateTime.now())) {
-
-                throw new RuntimeException("Please wait before requesting another OTP");
-            }
+        } else {
+            throw new InvalidIdentifierException("Email or Mobile is required");
         }
 
+        // Check for existing OTP
+        Optional<Otp> existingOtp = otpRepository.findTopByIdentifierOrderByExpiryTimeDesc(identifier);
+
+        if (existingOtp.isPresent() &&
+                existingOtp.get().getExpiryTime().minusMinutes(4).isAfter(LocalDateTime.now())) {
+            throw new TooManyRequestsException("Please wait before requesting another OTP");
+        }
+
+        // Generate OTP
         String otp = otpUtil.generateOtp();
 
+        // Remove previous OTPs for the identifier
         otpRepository.deleteByIdentifier(identifier);
 
+        // Save new OTP
         Otp otpEntity = new Otp();
         otpEntity.setIdentifier(identifier);
         otpEntity.setOtp(otp);
         otpEntity.setExpiryTime(LocalDateTime.now().plusMinutes(5));
         otpEntity.setAttempts(0);
-
         otpRepository.save(otpEntity);
 
-        System.out.println("Generated OTP: " + otp);
+        // Send OTP
+        if (identifier.contains("@")) {
+            // Email OTP
+            try {
+                log.info("Sending OTP {} to email {}", otp, identifier);
+                emailService.sendOtpEmail(identifier, otp);
+            } catch (MailException e) {
+                log.error("Failed to send OTP to email {}", identifier, e);
+                throw new EmailSendException("Unable to send OTP to email");
+            }
+        } else {
+            // Mobile OTP
+            String message = "<#> Your FlintnThread OTP is " + otp + "\nflintnthread.in #" + otp;
+            smsService.sendSms("+91" + identifier, message);
+        }
 
-        return otp;
+        // Return delivery channel instead of raw OTP
+        return identifier.contains("@") ? "EMAIL" : "SMS";
     }
+
 
     // VERIFY OTP
     @Override
