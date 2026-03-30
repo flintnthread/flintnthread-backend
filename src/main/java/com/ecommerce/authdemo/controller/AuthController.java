@@ -4,7 +4,6 @@ import com.ecommerce.authdemo.dto.AuthResponseDTO;
 import com.ecommerce.authdemo.dto.LoginRequestDTO;
 import com.ecommerce.authdemo.dto.VerifyOtpDTO;
 import com.ecommerce.authdemo.exception.*;
-
 import com.ecommerce.authdemo.service.AuthService;
 
 import jakarta.validation.Valid;
@@ -27,40 +26,40 @@ public class AuthController {
     @PostMapping("/send-otp")
     public ResponseEntity<?> sendOtp(@Valid @RequestBody LoginRequestDTO dto) {
 
-        try {
-            String otp = authService.sendOtp(dto);
+        Map<String, Object> response = new HashMap<>();
 
-            Map<String, Object> response = new HashMap<>();
+        try {
+            // Generate OTP
+            String deliveryChannel = authService.sendOtp(dto); // returns "SMS" or "EMAIL"
+
             response.put("success", true);
-            response.put("message", "OTP sent successfully");
-            response.put("otp", otp); // for testing only, remove in production
+            response.put("message", "OTP sent successfully via " + deliveryChannel);
 
             return ResponseEntity.ok(response);
 
-        } catch (InvalidMobileException e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+        } catch (InvalidMobileException | InvalidEmailException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
 
         } catch (TooManyRequestsException e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error);
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response);
 
         } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "Something went wrong");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+            response.put("success", false);
+            response.put("message", "Something went wrong: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
+
 
     @PostMapping("/verify-otp")
     public ResponseEntity<?> verifyOtp(@Valid @RequestBody VerifyOtpDTO dto) {
 
         try {
+
             AuthResponseDTO authResponse = authService.verifyOtp(dto);
 
             Map<String, Object> response = new HashMap<>();
@@ -71,27 +70,35 @@ public class AuthController {
             return ResponseEntity.ok(response);
 
         } catch (OtpNotFoundException e) {
+
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("message", e.getMessage());
+
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
 
         } catch (OtpExpiredException e) {
+
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("message", e.getMessage());
+
             return ResponseEntity.status(HttpStatus.GONE).body(error);
 
         } catch (TooManyAttemptsException e) {
+
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("message", e.getMessage());
+
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error);
 
         } catch (Exception e) {
+
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("message", "Something went wrong");
+
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
     }

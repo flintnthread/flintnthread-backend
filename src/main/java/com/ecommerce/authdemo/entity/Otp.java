@@ -12,20 +12,19 @@ import java.time.LocalDateTime;
 
 @Data
 @Entity
-    public class Otp {
+public class Otp {
 
-        @Id
-        @GeneratedValue(strategy = GenerationType.IDENTITY)
-        private Long id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-        private String identifier;
+    private String identifier;
 
-        private String otp;
+    private String otp;
 
-        private LocalDateTime expiryTime;
+    private LocalDateTime expiryTime;
 
-        private int attempts;
+    private int attempts;
 
-        // getters setters
-    }
-
+    // getters setters
+}
