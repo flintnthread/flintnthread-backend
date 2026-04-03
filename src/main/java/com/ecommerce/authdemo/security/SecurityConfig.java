@@ -52,17 +52,27 @@ public class SecurityConfig {
                         .permitAll()
 
                         // --------------------------------
-                        // PUBLIC CATEGORY APIs (Mobile App)
+                        // PUBLIC CATEGORY APIs
                         // --------------------------------
                         .requestMatchers(
                                 "/api/categories/main",
                                 "/api/categories/tree",
                                 "/api/categories/*/subcategories",
                                 "/api/categories/{id}",
-                                "/api/categories/**",
-                                "/api/products/**"
-
+                                "/api/categories/**"
                         ).permitAll()
+
+                        // --------------------------------
+                        // PUBLIC PRODUCT APIs
+                        // --------------------------------
+                        .requestMatchers("/api/products/**")
+                        .permitAll()
+
+                        // --------------------------------
+                        // PUBLIC SEARCH APIs  ⭐ ADDED
+                        // --------------------------------
+                        .requestMatchers("/api/search/**")
+                        .permitAll()
 
                         // --------------------------------
                         // ADMIN CATEGORY MANAGEMENT
@@ -89,7 +99,6 @@ public class SecurityConfig {
         return http.build();
     }
 
-
     // Authentication Manager
     @Bean
     public AuthenticationManager authenticationManager(
@@ -97,5 +106,4 @@ public class SecurityConfig {
 
         return config.getAuthenticationManager();
     }
-
 }

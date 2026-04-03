@@ -99,7 +99,7 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductListDTO> searchProducts(String keyword) {
 
         List<Product> products =
-                productRepository.findByProductNameContainingIgnoreCaseAndStatus(keyword, "active");
+                productRepository.findByNameContainingIgnoreCaseAndStatus(keyword, "active");
 
         return products.stream()
                 .map(this::mapToListDTO)
@@ -116,7 +116,7 @@ public class ProductServiceImpl implements ProductService {
         dto.setSubcategoryId(product.getSubcategoryId());
         dto.setSellerId(product.getSellerId());
 
-        dto.setName(product.getProductName());
+        dto.setName(product.getName());
         dto.setSku(product.getSku());
         dto.setHsnCode(product.getHsnCode());
         dto.setProductMaterialType(product.getProductMaterialType());
@@ -145,7 +145,7 @@ public class ProductServiceImpl implements ProductService {
         ProductListDTO dto = new ProductListDTO();
 
         dto.setId(product.getId());
-        dto.setName(product.getProductName());
+        dto.setName(product.getName());
         dto.setSku(product.getSku());
         dto.setCategoryId(product.getCategoryId());
         dto.setSubcategoryId(product.getSubcategoryId());

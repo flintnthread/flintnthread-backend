@@ -33,8 +33,9 @@ public class Product {
     private Long weightSlabId;
 
     // BASIC DETAILS
-    @Column(name = "product_name")
-    private String productName;
+    @Column(name = "name")
+    private String name;
+
 
     private String sku;
 
@@ -117,4 +118,5 @@ public class Product {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
 }

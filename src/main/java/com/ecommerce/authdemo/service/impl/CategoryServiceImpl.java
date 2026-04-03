@@ -188,7 +188,7 @@ public class CategoryServiceImpl implements CategoryService {
                 categoryRepository.findByCategoryNameContainingIgnoreCase(keyword);
 
         List<Product> products =
-                productRepository.findByProductNameContainingIgnoreCase(keyword);
+                productRepository.findByNameContainingIgnoreCase(keyword);
 
         result.put("categories", categories);
         result.put("products", products);
