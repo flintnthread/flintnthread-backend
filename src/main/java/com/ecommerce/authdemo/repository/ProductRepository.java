@@ -17,15 +17,42 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     // SUBCATEGORY PRODUCTS
     List<Product> findBySubcategoryIdAndStatus(Long subcategoryId, String status);
 
-    // SEARCH PRODUCTS WITH STATUS
-    List<Product> findByProductNameContainingIgnoreCaseAndStatus(String keyword, String status);
-
     // PAGINATION - CATEGORY PRODUCTS
     Page<Product> findByCategoryIdAndStatus(Long categoryId, String status, Pageable pageable);
 
     // PAGINATION - SUBCATEGORY PRODUCTS
     Page<Product> findBySubcategoryIdAndStatus(Long subcategoryId, String status, Pageable pageable);
 
-    // GENERAL SEARCH (HOME SEARCH BAR)
-    List<Product> findByProductNameContainingIgnoreCase(String keyword);
+    /*
+    -----------------------------------------
+    🔎 SEARCH USING PRODUCT NAME
+    -----------------------------------------
+    */
+
+    List<Product> findByNameContainingIgnoreCase(String keyword);
+
+    List<Product> findTop5ByNameContainingIgnoreCase(String keyword);
+
+    List<Product> findTop20ByNameContainingIgnoreCase(String keyword);
+
+    List<Product> findTop20ByNameContainingIgnoreCaseAndStatus(String keyword, String status);
+
+    Page<Product> findByNameContainingIgnoreCase(String keyword, Pageable pageable);
+
+    Page<Product> findByNameContainingIgnoreCaseAndStatus(
+            String keyword,
+            String status,
+            Pageable pageable
+    );
+
+    List<Product> findByNameContainingIgnoreCaseAndStatus(String name, String status);
+
+    /*
+    -----------------------------------------
+    🔥 TRENDING PRODUCTS
+    -----------------------------------------
+    */
+
+    List<Product> findTop10ByOrderByIdDesc();
+
 }

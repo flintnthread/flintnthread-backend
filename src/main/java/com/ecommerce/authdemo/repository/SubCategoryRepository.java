@@ -13,6 +13,8 @@ public interface SubCategoryRepository extends JpaRepository<SubCategory, Long> 
 
     List<SubCategory> findByCategoryIdAndStatus(Long categoryId, Integer status);
 
+    List<SubCategory> findTop10BySubcategoryNameContainingIgnoreCase(String keyword);
+
 
 
 

@@ -16,4 +16,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     // Search Categories
     List<Category> findByCategoryNameContainingIgnoreCase(String keyword);
 
+    List<Category> findTop10ByCategoryNameContainingIgnoreCase(String keyword);
+
 }
