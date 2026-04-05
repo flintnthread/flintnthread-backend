@@ -51,6 +51,12 @@ public class SecurityConfig {
                         .requestMatchers("/api/location/**")
                         .permitAll()
 
+                                // --------------------------------
+                                // CART APIs
+                                // --------------------------------
+                                .requestMatchers("/api/cart/**")
+                                .permitAll()
+
                         // --------------------------------
                         // PUBLIC CATEGORY APIs
                         // --------------------------------
