@@ -24,6 +24,13 @@ public class Category {
     @Column(name="category_image")
     private String image;
 
+    @Column(name = "banner_image")
+    private String bannerImage;
+
+    @Column(name = "mobile_image")
+    private String mobileImage;
+
+
     @Column(name="hsn_code")
     private String hsnCode;
 
