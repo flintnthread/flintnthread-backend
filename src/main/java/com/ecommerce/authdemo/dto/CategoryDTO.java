@@ -9,6 +9,8 @@ import lombok.Data;
         private Long parentId;
         private String categoryName;
         private String image;
+        private String mobileImage;
+        private String bannerImage;
         private String hsnCode;
         private Double gstPercentage;
         private Integer status;

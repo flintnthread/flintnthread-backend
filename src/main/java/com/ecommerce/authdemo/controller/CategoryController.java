@@ -1,5 +1,6 @@
 package com.ecommerce.authdemo.controller;
 
+import com.ecommerce.authdemo.dto.CategoryRequest;
 import com.ecommerce.authdemo.dto.CategoryWithSubDTO;
 import com.ecommerce.authdemo.dto.SubCategoryResponseDTO;
 import com.ecommerce.authdemo.entity.Category;
@@ -8,6 +9,7 @@ import com.ecommerce.authdemo.service.CategoryService;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -104,4 +106,14 @@ public class CategoryController {
         Map<String, Object> result = categoryService.searchAll(keyword);
         return ResponseEntity.ok(result);
     }
+
+    @PostMapping("/{id}/upload-images")
+    public Category uploadCategoryImages(
+            @PathVariable Long id,
+            @RequestParam(value = "bannerImage", required = false) MultipartFile bannerImage,
+            @RequestParam(value = "mobileImage", required = false) MultipartFile mobileImage) {
+
+        return categoryService.uploadCategoryImages(id, bannerImage, mobileImage);
+    }
+
 }

@@ -45,6 +45,11 @@ public class SecurityConfig {
                                 "/api/auth/**"
                         ).permitAll()
 
+
+                        .requestMatchers("/image/**")
+                        .permitAll()
+
+
                         // --------------------------------
                         // PUBLIC LOCATION APIs
                         // --------------------------------

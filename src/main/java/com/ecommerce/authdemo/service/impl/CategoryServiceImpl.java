@@ -1,5 +1,6 @@
 package com.ecommerce.authdemo.service.impl;
 
+import com.ecommerce.authdemo.dto.CategoryRequest;
 import com.ecommerce.authdemo.dto.CategoryTreeDTO;
 import com.ecommerce.authdemo.dto.CategoryWithSubDTO;
 import com.ecommerce.authdemo.dto.SubCategoryResponseDTO;
@@ -11,28 +12,39 @@ import com.ecommerce.authdemo.repository.ProductRepository;
 import com.ecommerce.authdemo.repository.SubCategoryRepository;
 import com.ecommerce.authdemo.service.CategoryService;
 
+import com.ecommerce.authdemo.service.ImageUploadService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
-@Transactional(readOnly = true)
+@Transactional
 public class CategoryServiceImpl implements CategoryService {
 
     private final CategoryRepository categoryRepository;
     private final SubCategoryRepository subCategoryRepository;
     private final ProductRepository productRepository;
+    private final ImageUploadService imageUploadService;
+
 
     // Constructor Injection
     public CategoryServiceImpl(CategoryRepository categoryRepository,
                                SubCategoryRepository subCategoryRepository,
-                               ProductRepository productRepository) {
+                               ProductRepository productRepository,
+                               ImageUploadService imageUploadService)
+    {
 
         this.categoryRepository = categoryRepository;
         this.subCategoryRepository = subCategoryRepository;
         this.productRepository = productRepository;
+        this.imageUploadService = imageUploadService;
     }
 
     /**
@@ -174,6 +186,7 @@ public class CategoryServiceImpl implements CategoryService {
      * Search both categories and products
      */
     @Override
+
     public Map<String, Object> searchAll(String keyword) {
 
         Map<String, Object> result = new HashMap<>();
@@ -195,4 +208,29 @@ public class CategoryServiceImpl implements CategoryService {
 
         return result;
     }
+
+    @Override
+    @Transactional
+    public Category uploadCategoryImages(Long categoryId,
+                                         MultipartFile bannerImage,
+                                         MultipartFile mobileImage) {
+
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new RuntimeException("Category not found"));
+
+        // Banner image optional
+        if (bannerImage != null && !bannerImage.isEmpty()) {
+            String bannerUrl = imageUploadService.uploadImage(bannerImage);
+            category.setBannerImage(bannerUrl);
+        }
+
+        // Mobile image optional
+        if (mobileImage != null && !mobileImage.isEmpty()) {
+            String mobileUrl = imageUploadService.uploadImage(mobileImage);
+            category.setMobileImage(mobileUrl);
+        }
+
+        return categoryRepository.save(category);
+    }
+
 }
