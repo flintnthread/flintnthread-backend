@@ -15,9 +15,6 @@ public class ProductVariant {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // PRODUCT RELATION
-    @Column(name = "product_id")
-    private Long productId;
 
     // VARIANT ATTRIBUTES
     private String color;
@@ -92,4 +89,9 @@ public class ProductVariant {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    @ManyToOne
+    @JoinColumn(name = "product_id")
+    private Product product;
+
 }

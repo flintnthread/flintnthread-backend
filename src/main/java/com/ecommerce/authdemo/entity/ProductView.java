@@ -14,8 +14,6 @@ import java.time.LocalDateTime;
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         private Long id;
 
-        @Column(name="product_id")
-        private Long productId;
 
         @Column(name="user_id")
         private Long userId;
@@ -36,5 +34,11 @@ import java.time.LocalDateTime;
         public void prePersist() {
             this.viewedAt = LocalDateTime.now();
         }
+
+
+        @ManyToOne
+        @JoinColumn(name = "product_id")
+        private Product product;
+
     }
 

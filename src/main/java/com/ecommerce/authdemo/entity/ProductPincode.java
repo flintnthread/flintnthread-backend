@@ -14,8 +14,6 @@ import java.time.LocalDateTime;
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         private Long id;
 
-        @Column(name = "product_id")
-        private Long productId;
 
         @Column(name = "pincode_id")
         private Long pincodeId;
@@ -24,5 +22,9 @@ import java.time.LocalDateTime;
 
         @Column(name = "created_at")
         private LocalDateTime createdAt;
+
+        @ManyToOne
+        @JoinColumn(name = "product_id")
+        private Product product;
     }
 

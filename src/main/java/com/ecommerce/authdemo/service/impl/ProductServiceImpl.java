@@ -32,12 +32,11 @@ public class ProductServiceImpl implements ProductService {
                               ProductPincodeRepository productPincodeRepository,
                               ProductViewRepository productViewRepository) {
 
-            this.productRepository = productRepository;
+        this.productRepository = productRepository;
         this.productImageRepository = productImageRepository;
         this.variantRepository = variantRepository;
         this.productPincodeRepository = productPincodeRepository;
         this.productViewRepository = productViewRepository;
-
     }
 
     // CATEGORY PRODUCTS
@@ -168,7 +167,7 @@ public class ProductServiceImpl implements ProductService {
         ProductImageDTO dto = new ProductImageDTO();
 
         dto.setId(image.getId());
-        dto.setProductId(image.getProductId());
+        dto.setProductId(image.getProduct().getId());
         dto.setImagePath(image.getImagePath());
         dto.setIsPrimary(image.getIsPrimary());
         dto.setSortOrder(image.getSortOrder());
@@ -182,7 +181,7 @@ public class ProductServiceImpl implements ProductService {
         ProductVariantDTO dto = new ProductVariantDTO();
 
         dto.setId(variant.getId());
-        dto.setProductId(variant.getProductId());
+        dto.setProductId(variant.getProduct().getId());
         dto.setColor(variant.getColor());
         dto.setSize(variant.getSize());
         dto.setSku(variant.getSku());
@@ -217,8 +216,10 @@ public class ProductServiceImpl implements ProductService {
     public void saveProductView(ProductViewDTO dto) {
 
         ProductView view = new ProductView();
+        Product product = productRepository.findById(dto.getProductId()).orElseThrow();
 
-        view.setProductId(dto.getProductId());
+        view.setProduct(product);
+
         view.setUserId(dto.getUserId());
         view.setSessionId(dto.getSessionId());
         view.setIpAddress(dto.getIpAddress());
@@ -241,7 +242,7 @@ public class ProductServiceImpl implements ProductService {
         }
 
         List<Long> productIds = views.stream()
-                .map(ProductView::getProductId)
+                .map(view -> view.getProduct().getId())
                 .distinct()
                 .toList();
 
