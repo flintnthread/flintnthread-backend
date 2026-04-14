@@ -42,6 +42,6 @@ public class SubCategory {
     @Column(name = "seller_id")
     private Long sellerId;
 
-    @Column(name = "mobile_image")
+    @Column(name = "mobile_image")   // ✅ MATCH DB
     private String mobileImage;
 }
