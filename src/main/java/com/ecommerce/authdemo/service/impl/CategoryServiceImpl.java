@@ -1,6 +1,5 @@
 package com.ecommerce.authdemo.service.impl;
 
-import com.ecommerce.authdemo.dto.CategoryRequest;
 import com.ecommerce.authdemo.dto.CategoryTreeDTO;
 import com.ecommerce.authdemo.dto.CategoryWithSubDTO;
 import com.ecommerce.authdemo.dto.SubCategoryResponseDTO;
@@ -17,10 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -231,6 +226,30 @@ public class CategoryServiceImpl implements CategoryService {
         }
 
         return categoryRepository.save(category);
+    }
+
+    @Transactional
+    @Override
+    public SubCategory uploadSubCategoryImages(Long id,
+                                               MultipartFile image,
+                                               MultipartFile mobileImage) {
+
+        SubCategory subCategory = subCategoryRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("SubCategory not found"));
+
+        // Subcategory image optional
+        if (image != null && !image.isEmpty()) {
+            String imageUrl = imageUploadService.uploadImage(image);
+            subCategory.setSubcategoryImage(imageUrl);
+        }
+
+        // Mobile image optional
+        if (mobileImage != null && !mobileImage.isEmpty()) {
+            String mobileUrl = imageUploadService.uploadImage(mobileImage);
+            subCategory.setMobileimage(mobileUrl);
+        }
+
+        return subCategoryRepository.save(subCategory);
     }
 
 }
