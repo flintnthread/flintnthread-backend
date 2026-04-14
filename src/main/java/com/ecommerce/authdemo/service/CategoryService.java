@@ -5,6 +5,8 @@ import com.ecommerce.authdemo.dto.CategoryWithSubDTO;
 import com.ecommerce.authdemo.dto.SubCategoryResponseDTO;
 import com.ecommerce.authdemo.entity.Category;
 import com.ecommerce.authdemo.dto.CategoryTreeDTO;
+import com.ecommerce.authdemo.entity.SubCategory;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -35,6 +37,11 @@ public interface CategoryService {
 
     Category uploadCategoryImages(Long categoryId,
                                   MultipartFile bannerImage,
-                                  MultipartFile mobileImage);}
+                                  MultipartFile mobileImage);
+
+    SubCategory uploadSubCategoryImages(Long id,
+                                        MultipartFile image,
+                                        MultipartFile mobileImage);
+}
 
 
