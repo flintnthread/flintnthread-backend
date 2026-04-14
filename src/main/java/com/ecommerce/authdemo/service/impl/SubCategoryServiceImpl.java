@@ -31,7 +31,7 @@ import java.util.stream.Collectors;
                             sc.getId(),
                             sc.getSubcategoryName(),
                             sc.getSubcategoryImage(),
-                            sc.getMobileimage()        // ✅ mobile image
+                            sc.getMobileImage()        // ✅ mobile image
                     ))
                     .collect(Collectors.toList());
         }

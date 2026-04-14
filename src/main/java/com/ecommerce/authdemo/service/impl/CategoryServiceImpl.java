@@ -167,7 +167,7 @@ public class CategoryServiceImpl implements CategoryService {
                                 sc.getId(),
                                 sc.getSubcategoryName(),
                                 sc.getSubcategoryImage(),
-                                sc.getMobileimage()
+                                sc.getMobileImage()
 
                         ))
                         .toList();
@@ -250,7 +250,7 @@ public class CategoryServiceImpl implements CategoryService {
         // Mobile image optional
         if (mobileImage != null && !mobileImage.isEmpty()) {
             String mobileUrl = imageUploadService.uploadImage(mobileImage);
-            subCategory.setMobileimage(mobileUrl);
+            subCategory.setMobileImage(mobileUrl);
         }
 
         return subCategoryRepository.save(subCategory);
