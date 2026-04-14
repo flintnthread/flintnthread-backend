@@ -166,13 +166,17 @@ public class CategoryServiceImpl implements CategoryService {
                         .map(sc -> new SubCategoryResponseDTO(
                                 sc.getId(),
                                 sc.getSubcategoryName(),
-                                sc.getSubcategoryImage()
+                                sc.getSubcategoryImage(),
+                                sc.getMobileimage()
+
                         ))
                         .toList();
 
         CategoryWithSubDTO response = new CategoryWithSubDTO();
         response.setCategoryName(category.getCategoryName());
         response.setSubcategories(subCategoryList);
+        response.setMobileImage(category.getMobileImage()); // ✅ add
+
 
         return List.of(response);
     }

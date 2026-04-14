@@ -7,6 +7,8 @@ import java.util.List;
 public class CategoryWithSubDTO {
 
     private String categoryName;
+    private String mobileImage; // ✅ ADD
+
     private List<SubCategoryResponseDTO> subcategories;
 
 }

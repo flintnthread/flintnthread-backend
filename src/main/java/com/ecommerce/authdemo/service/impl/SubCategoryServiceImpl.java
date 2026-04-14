@@ -30,7 +30,8 @@ import java.util.stream.Collectors;
                     .map(sc -> new SubCategoryResponseDTO(
                             sc.getId(),
                             sc.getSubcategoryName(),
-                            sc.getSubcategoryImage()
+                            sc.getSubcategoryImage(),
+                            sc.getMobileimage()        // ✅ mobile image
                     ))
                     .collect(Collectors.toList());
         }

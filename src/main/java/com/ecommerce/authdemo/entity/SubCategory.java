@@ -42,6 +42,6 @@ public class SubCategory {
     @Column(name = "seller_id")
     private Long sellerId;
 
-    @Column(name = "mobileimage")
-    private String mobileimage;
+    @Column(name = "mobile_image")
+    private String mobileImage;
 }
