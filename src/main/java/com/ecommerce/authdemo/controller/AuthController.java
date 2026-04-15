@@ -29,8 +29,7 @@ public class AuthController {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // Generate OTP
-            String deliveryChannel = authService.sendOtp(dto); // returns "SMS" or "EMAIL"
+            String deliveryChannel = authService.sendOtp(dto);
 
             response.put("success", true);
             response.put("message", "OTP sent successfully via " + deliveryChannel);
@@ -38,31 +37,39 @@ public class AuthController {
             return ResponseEntity.ok(response);
 
         } catch (InvalidMobileException | InvalidEmailException e) {
+
             response.put("success", false);
             response.put("message", e.getMessage());
+
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
 
         } catch (TooManyRequestsException e) {
+
             response.put("success", false);
             response.put("message", e.getMessage());
+
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response);
 
         } catch (Exception e) {
+
+            e.printStackTrace(); // 🔥 DEBUG
+
             response.put("success", false);
-            response.put("message", "Something went wrong: " + e.getMessage());
+            response.put("message", e.getMessage()); // ✅ REAL ERROR
+
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
-
     @PostMapping("/verify-otp")
     public ResponseEntity<?> verifyOtp(@Valid @RequestBody VerifyOtpDTO dto) {
+
+        Map<String, Object> response = new HashMap<>();
 
         try {
 
             AuthResponseDTO authResponse = authService.verifyOtp(dto);
 
-            Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("token", authResponse.getToken());
             response.put("role", authResponse.getRole());
@@ -71,35 +78,33 @@ public class AuthController {
 
         } catch (OtpNotFoundException e) {
 
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", e.getMessage());
+            response.put("success", false);
+            response.put("message", e.getMessage());
 
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
 
         } catch (OtpExpiredException e) {
 
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", e.getMessage());
+            response.put("success", false);
+            response.put("message", e.getMessage());
 
-            return ResponseEntity.status(HttpStatus.GONE).body(error);
+            return ResponseEntity.status(HttpStatus.GONE).body(response);
 
         } catch (TooManyAttemptsException e) {
 
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", e.getMessage());
+            response.put("success", false);
+            response.put("message", e.getMessage());
 
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(error);
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(response);
 
         } catch (Exception e) {
 
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "Something went wrong");
+            e.printStackTrace(); // 🔥 VERY IMPORTANT
 
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+            response.put("success", false);
+            response.put("message", e.getMessage()); // ✅ SHOW REAL ERROR
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 }
