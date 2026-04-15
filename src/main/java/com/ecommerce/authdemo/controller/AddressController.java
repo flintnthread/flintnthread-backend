@@ -1,50 +1,57 @@
 package com.ecommerce.authdemo.controller;
 
 import com.ecommerce.authdemo.dto.AddressRequest;
+import com.ecommerce.authdemo.dto.ApiResponse;
 import com.ecommerce.authdemo.entity.Address;
 import com.ecommerce.authdemo.service.AddressService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/address")
+@RequestMapping("/api/addresses")
 @RequiredArgsConstructor
 public class AddressController {
 
     private final AddressService addressService;
 
-    @PostMapping("/add")
-    public Address addAddress(@RequestBody AddressRequest request) {
-        return addressService.addAddress(request);
+    @PostMapping
+    public ResponseEntity<ApiResponse<Address>> add(@Valid @RequestBody AddressRequest request) {
+        Address address = addressService.addAddress(request);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Address added successfully", address));
     }
 
-    @GetMapping("/user/{userId}")
-    public List<Address> getUserAddresses(@PathVariable Integer userId) {
-        return addressService.getUserAddresses(userId);
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<Address>>> getAll() {
+        List<Address> list = addressService.getUserAddresses();
+        return ResponseEntity.ok(new ApiResponse<>(true, "Address list fetched", list));
     }
 
-    @PutMapping("/update/{id}")
-    public Address updateAddress(@PathVariable Integer id,
-                                 @RequestBody AddressRequest request) {
-        return addressService.updateAddress(id, request);
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<Address>> update(@PathVariable Integer id,
+                                                       @Valid @RequestBody AddressRequest request) {
+        Address updated = addressService.updateAddress(id, request);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Address updated successfully", updated));
     }
 
-    @DeleteMapping("/delete/{id}")
-    public String deleteAddress(@PathVariable Integer id) {
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<String>> delete(@PathVariable Integer id) {
         addressService.deleteAddress(id);
-        return "Address Deleted";
+        return ResponseEntity.ok(new ApiResponse<>(true, "Address deleted successfully", null));
     }
 
-    @PutMapping("/default/{userId}/{addressId}")
-    public Address setDefaultAddress(@PathVariable Integer userId,
-                                     @PathVariable Integer addressId) {
-        return addressService.setDefaultAddress(userId, addressId);
+    @PutMapping("/{id}/default")
+    public ResponseEntity<ApiResponse<Address>> setDefault(@PathVariable Integer id) {
+        Address address = addressService.setDefaultAddress(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Default address updated", address));
     }
 
-    @GetMapping("/default/{userId}")
-    public Address getDefaultAddress(@PathVariable Integer userId) {
-        return addressService.getDefaultAddress(userId);
+    @GetMapping("/default")
+    public ResponseEntity<ApiResponse<Address>> getDefault() {
+        Address address = addressService.getDefaultAddress();
+        return ResponseEntity.ok(new ApiResponse<>(true, "Default address fetched", address));
     }
 }

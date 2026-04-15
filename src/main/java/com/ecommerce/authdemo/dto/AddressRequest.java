@@ -5,8 +5,6 @@ import lombok.Data;
 @Data
 public class AddressRequest {
 
-    private Integer userId;
-
     private String name;
     private String email;
     private String phone;
@@ -23,4 +21,8 @@ public class AddressRequest {
     private String addressType;
 
     private Boolean isDefault;
+
+    private Double latitude;
+    private Double longitude;
+
 }
