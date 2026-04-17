@@ -12,10 +12,7 @@ import java.util.List;
 @Table(name = "cart")
 @Getter
 @Setter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class Cart extends BaseEntity {
+public class Cart {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,64 +21,20 @@ public class Cart extends BaseEntity {
     @Column(name = "user_id")
     private Long userId;
 
-    @Builder.Default
-    @Column(name = "total_amount", precision = 12, scale = 2)
-    private BigDecimal totalAmount = BigDecimal.ZERO;
+    @Column(name = "session_id")
+    private String sessionId;
 
-    @Builder.Default
-    @Column(name = "discount_amount", precision = 12, scale = 2)
-    private BigDecimal discountAmount = BigDecimal.ZERO;
+    private String currency;
 
-    @Builder.Default
-    @Column(name = "final_amount", precision = 12, scale = 2)
-    private BigDecimal finalAmount = BigDecimal.ZERO;
+    @Column(name = "total_amount")
+    private BigDecimal totalAmount;
 
-    @Builder.Default
-    @Column(name = "currency", length = 10)
-    private String currency = "INR";
+    @Column(name = "discount_amount")
+    private BigDecimal discountAmount;
 
-    @Builder.Default
-    @JsonManagedReference
-    @OneToMany(
-            mappedBy = "cart",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true,
-            fetch = FetchType.LAZY
-    )
-    private List<CartItem> items = new ArrayList<>();
+    @Column(name = "final_amount")
+    private BigDecimal finalAmount;
 
-
-    /**
-     * Add item to cart
-     */
-    public void addItem(CartItem item) {
-        items.add(item);
-        item.setCart(this);
-        recalculateCart();
-    }
-
-    /**
-     * Remove item from cart
-     */
-    public void removeItem(CartItem item) {
-        items.remove(item);
-        item.setCart(null);
-        recalculateCart();
-    }
-
-    /**
-     * Recalculate cart totals
-     */
-    public void recalculateCart() {
-
-        this.totalAmount = items.stream()
-                .map(CartItem::getTotalPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (discountAmount == null) {
-            discountAmount = BigDecimal.ZERO;
-        }
-
-        this.finalAmount = totalAmount.subtract(discountAmount);
-    }
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<CartItem> items;
 }
