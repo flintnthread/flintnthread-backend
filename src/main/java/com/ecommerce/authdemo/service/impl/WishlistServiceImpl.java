@@ -95,7 +95,9 @@ public class WishlistServiceImpl implements WishlistService {
         response.setAddedAt(wishlist.getCreatedAt());
 
         if (product.getImages() != null && !product.getImages().isEmpty()) {
-            response.setImage(product.getImages().get(0).getImagePath());
+            response.setImage(
+                    product.getImages().iterator().next().getImagePath()
+            );
         }
 
         if (product.getVariants() != null && !product.getVariants().isEmpty()) {
