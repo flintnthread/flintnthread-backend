@@ -9,6 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name = "products")
@@ -69,7 +70,8 @@ public class Product {
     private List<ProductVariant> variants;
 
     @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
-    private List<ProductImage> images;
+    private Set<ProductImage> images;
+
 
     @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
     private List<ProductView> views;
