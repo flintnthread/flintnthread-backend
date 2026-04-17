@@ -5,6 +5,7 @@ import com.ecommerce.authdemo.dto.CategoryWithSubDTO;
 import com.ecommerce.authdemo.dto.SubCategoryResponseDTO;
 import com.ecommerce.authdemo.entity.Category;
 import com.ecommerce.authdemo.dto.CategoryTreeDTO;
+import com.ecommerce.authdemo.entity.SubCategory;
 import com.ecommerce.authdemo.service.CategoryService;
 
 import org.springframework.http.ResponseEntity;
@@ -114,6 +115,15 @@ public class CategoryController {
             @RequestParam(value = "mobileImage", required = false) MultipartFile mobileImage) {
 
         return categoryService.uploadCategoryImages(id, bannerImage, mobileImage);
+    }
+
+    @PostMapping("/subcategories/{id}/upload-images")
+    public SubCategory uploadSubCategoryImages(
+            @PathVariable Long id,
+            @RequestParam(value = "image", required = false) MultipartFile image,
+            @RequestParam(value = "mobileImage", required = false) MultipartFile mobileImage) {
+
+        return categoryService.uploadSubCategoryImages(id, image, mobileImage);
     }
 
 }

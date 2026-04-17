@@ -1,11 +1,13 @@
 package com.ecommerce.authdemo.entity;
 
+import com.ecommerce.authdemo.dto.ProductImageDTO;
 import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
-    @Data
+@Data
     @Entity
     @Table(name = "product_images")
     public class ProductImage {

@@ -4,29 +4,30 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
-    @Data
-    public class ProductVariantDTO {
+@Data
+public class ProductVariantDTO {
 
-        private Long id;
+    private Long id;
 
-        private Long productId;
+    private Long productId;
 
-        private String color;
+    private String color;
+    private String size;
+    private String sku;
 
-        private String size;
+    private BigDecimal mrpPrice;
+    private BigDecimal sellingPrice;
+    private BigDecimal finalPrice;
 
-        private String sku;
+    private BigDecimal discountPercentage;
+    private BigDecimal discountAmount;
 
-        private BigDecimal mrpPrice;
+    private BigDecimal taxPercentage;
+    private BigDecimal taxAmount;
 
-        private BigDecimal sellingPrice;
+    private Integer stock;
+    private Boolean inStock;
 
-        private BigDecimal finalPrice;
-
-        private Integer stock;
-
-        private BigDecimal discountPercentage;
-
-        private String videoPath;
-    }
-
+    private String videoPath;
+    private BigDecimal weight;
+}

@@ -1,136 +1,76 @@
 package com.ecommerce.authdemo.entity;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Data
 @Entity
 @Table(name = "products")
+@Getter
+@Setter
 public class Product {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // CATEGORY
-    @Column(name = "category_id")
-    private Long categoryId;
-
-    @Column(name = "subcategory_id")
-    private Long subcategoryId;
-
-    // SELLER
-    @Column(name = "seller_id")
-    private Long sellerId;
-
-    @Column(name = "size_chart_id")
-    private Long sizeChartId;
-
-    @Column(name = "weight_slab_id")
-    private Long weightSlabId;
-
-    // BASIC DETAILS
     private String name;
-
     private String sku;
 
-    @Column(name = "hsn_code")
-    private String hsnCode;
-
-    @Column(name = "product_material_type")
-    private String productMaterialType;
-
-    @Column(name = "short_description", columnDefinition = "TEXT")
     private String shortDescription;
-
-    @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(columnDefinition = "TEXT")
     private String features;
-
-    @Column(columnDefinition = "TEXT")
     private String specifications;
-
-    @Column(name = "return_policy", columnDefinition = "TEXT")
     private String returnPolicy;
 
-    @Column(name = "delivery_info", columnDefinition = "TEXT")
-    private String deliveryInfo;
-
-    @Column(name = "warranty_info", columnDefinition = "TEXT")
-    private String warrantyInfo;
-
-    @Column(name = "care_instructions", columnDefinition = "TEXT")
-    private String careInstructions;
-
-    // GST
-    @Column(name = "gst_percentage")
     private BigDecimal gstPercentage;
 
-    // DIMENSIONS
-    @Column(name = "length_cm")
     private BigDecimal lengthCm;
-
-    @Column(name = "width_cm")
     private BigDecimal widthCm;
-
-    @Column(name = "height_cm")
     private BigDecimal heightCm;
 
-    @Column(name = "product_weight")
     private BigDecimal productWeight;
 
-    // DELIVERY
-    @Column(name = "delivery_time_min")
-    private Integer deliveryTimeMin;
+    private Boolean isFragile = false;
 
-    @Column(name = "delivery_time_max")
-    private Integer deliveryTimeMax;
+    private Integer categoryId;
+    private Integer subcategoryId;
 
-    @Column(name = "intra_city_charge")
-    private BigDecimal intraCityCharge;
+    private Long sellerId;
 
-    @Column(name = "metro_metro_charge")
-    private BigDecimal metroMetroCharge;
+    private Boolean acceptCod = true;
+    private Boolean acceptPrepaid = true;
 
-    // FLAGS
-    @Column(name = "is_fragile")
-    private Boolean isFragile;
+    private Boolean deliverAllLocations = true;
 
-    @Column(name = "is_custom_pricing")
-    private Boolean isCustomPricing;
-
-    @Column(name = "deliver_all_locations")
-    private Boolean deliverAllLocations;
-
-    // STATUS
     private String status;
 
-    // TIMESTAMPS
-    @Column(name = "created_at")
+    private Integer deliveryTimeMin;
+    private Integer deliveryTimeMax;
+
+    @CreationTimestamp
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
+    @UpdateTimestamp
     private LocalDateTime updatedAt;
 
-
+    // ------------------------
     // RELATIONS
+    // ------------------------
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<ProductImage> images;
-
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
     private List<ProductVariant> variants;
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<ProductPincode> pincodes;
+    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
+    private List<ProductImage> images;
 
-    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
     private List<ProductView> views;
-
 }

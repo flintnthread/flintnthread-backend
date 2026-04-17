@@ -8,13 +8,10 @@ import lombok.*;
 import java.math.BigDecimal;
 
 @Entity
-@Table(name = "cart_item")
+@Table(name = "cart_items")
 @Getter
 @Setter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class CartItem extends BaseEntity {
+public class CartItem {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,36 +20,20 @@ public class CartItem extends BaseEntity {
     @Column(name = "product_id")
     private Long productId;
 
-    private Long sellerId;
-
-    private BigDecimal unitPrice;
-
     @Column(name = "variant_id")
     private Long variantId;
 
     private Integer quantity;
 
-    @Column(precision = 10, scale = 2)
     private BigDecimal price;
 
-    @Column(name = "total_price", precision = 12, scale = 2)
+    @Column(name = "total_price")
     private BigDecimal totalPrice;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "delivery_type")
-    private DeliveryType deliveryType;
+    @Column(name = "seller_id")
+    private Long sellerId;
 
-    @JsonBackReference
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne
     @JoinColumn(name = "cart_id")
     private Cart cart;
-
-    /**
-     * Calculate total price
-     */
-    public void calculateTotalPrice() {
-        if (price != null && quantity != null) {
-            this.totalPrice = price.multiply(BigDecimal.valueOf(quantity));
-        }
-    }
 }

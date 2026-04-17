@@ -1,6 +1,5 @@
 package com.ecommerce.authdemo.service.impl;
 
-import com.ecommerce.authdemo.dto.CategoryRequest;
 import com.ecommerce.authdemo.dto.CategoryTreeDTO;
 import com.ecommerce.authdemo.dto.CategoryWithSubDTO;
 import com.ecommerce.authdemo.dto.SubCategoryResponseDTO;
@@ -17,10 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -171,13 +166,17 @@ public class CategoryServiceImpl implements CategoryService {
                         .map(sc -> new SubCategoryResponseDTO(
                                 sc.getId(),
                                 sc.getSubcategoryName(),
-                                sc.getSubcategoryImage()
+                                sc.getSubcategoryImage(),
+                                sc.getMobileImage()
+
                         ))
                         .toList();
 
         CategoryWithSubDTO response = new CategoryWithSubDTO();
         response.setCategoryName(category.getCategoryName());
         response.setSubcategories(subCategoryList);
+        response.setMobileImage(category.getMobileImage()); // ✅ add
+
 
         return List.of(response);
     }
@@ -231,6 +230,30 @@ public class CategoryServiceImpl implements CategoryService {
         }
 
         return categoryRepository.save(category);
+    }
+
+    @Transactional
+    @Override
+    public SubCategory uploadSubCategoryImages(Long id,
+                                               MultipartFile image,
+                                               MultipartFile mobileImage) {
+
+        SubCategory subCategory = subCategoryRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("SubCategory not found"));
+
+        // Subcategory image optional
+        if (image != null && !image.isEmpty()) {
+            String imageUrl = imageUploadService.uploadImage(image);
+            subCategory.setSubcategoryImage(imageUrl);
+        }
+
+        // Mobile image optional
+        if (mobileImage != null && !mobileImage.isEmpty()) {
+            String mobileUrl = imageUploadService.uploadImage(mobileImage);
+            subCategory.setMobileImage(mobileUrl);
+        }
+
+        return subCategoryRepository.save(subCategory);
     }
 
 }

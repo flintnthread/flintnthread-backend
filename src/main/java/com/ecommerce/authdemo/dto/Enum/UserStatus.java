@@ -2,8 +2,8 @@ package com.ecommerce.authdemo.dto.Enum;
 
 public enum UserStatus {
 
-    ACTIVE,
-    INACTIVE,
-    BLOCKED
+    active,
+    inactive,
+    blocked
 
 }

@@ -1,42 +1,38 @@
 package com.ecommerce.authdemo.service;
 
-import com.ecommerce.authdemo.dto.DeliveryCheckDTO;
 import com.ecommerce.authdemo.dto.ProductDTO;
-import com.ecommerce.authdemo.dto.ProductFilterRequestDTO;
-import com.ecommerce.authdemo.dto.ProductListDTO;
 import com.ecommerce.authdemo.dto.ProductViewDTO;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
 public interface ProductService {
 
-    // CATEGORY PRODUCTS
-    List<ProductListDTO> getProductsByCategory(Long categoryId);
+    ProductDTO createProduct(ProductDTO dto);
 
-    // SUBCATEGORY PRODUCTS
-    List<ProductListDTO> getProductsBySubCategory(Long subCategoryId);
-
-    // PRODUCT DETAILS
     ProductDTO getProduct(Long id);
 
-    // SEARCH PRODUCTS
-    List<ProductListDTO> searchProducts(String keyword);
+    Page<ProductDTO> getAllProducts(Pageable pageable);
 
-    // DELIVERY CHECK
-    DeliveryCheckDTO checkDelivery(Long productId, Long pincodeId);
+    Page<ProductDTO> getByCategory(Long categoryId, Pageable pageable);
 
-    // SAVE PRODUCT VIEW
-    void saveProductView(ProductViewDTO dto);
+    List<ProductDTO> getRecentProducts();
 
-    // RECENTLY VIEWED
-    List<ProductListDTO> getRecentlyViewed(Long userId, String sessionId);
+    List<ProductDTO> getPopularProducts();
 
-    // MOST VIEWED PRODUCTS
-    List<ProductListDTO> getMostViewedProducts();
+    List<ProductDTO> getTrendingProducts();
 
-    // 🔥 ADVANCED FILTER API
-    Page<ProductListDTO> filterProducts(ProductFilterRequestDTO request);
+    List<ProductDTO> getRelatedProducts(Long productId);
+
+    List<ProductDTO> searchProducts(String keyword);
+
+    List<ProductDTO> getSellerProducts(Long sellerId);
+
+    void trackView(ProductViewDTO dto);
+
+    List<ProductDTO> getBySubCategory(Long subCategoryId);
+
 
 }

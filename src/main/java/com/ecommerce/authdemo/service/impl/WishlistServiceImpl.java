@@ -1,7 +1,5 @@
 package com.ecommerce.authdemo.service.impl;
 
-import com.ecommerce.authdemo.dto.ProductDTO;
-import com.ecommerce.authdemo.dto.WishlistProductResponse;
 import com.ecommerce.authdemo.dto.WishlistResponse;
 import com.ecommerce.authdemo.entity.Product;
 import com.ecommerce.authdemo.entity.ProductVariant;
@@ -30,9 +28,6 @@ public class WishlistServiceImpl implements WishlistService {
 
     }
 
-    // -------------------------
-    // ADD TO WISHLIST
-    // -------------------------
     @Override
     public WishlistResponse addToWishlist(Long userId, Long productId) {
 
@@ -57,9 +52,6 @@ public class WishlistServiceImpl implements WishlistService {
 
         return buildResponse(wishlist);
     }
-    // -------------------------
-    // GET USER WISHLIST
-    // -------------------------
     @Override
     public List<WishlistResponse> getUserWishlist(Long userId) {
 
@@ -71,9 +63,6 @@ public class WishlistServiceImpl implements WishlistService {
                 .toList();
     }
 
-    // -------------------------
-    // REMOVE FROM WISHLIST
-    // -------------------------
     @Override
     @Transactional
     public void removeFromWishlist(Long userId, Long productId) {
@@ -85,9 +74,6 @@ public class WishlistServiceImpl implements WishlistService {
         wishlistRepository.delete(wishlist);
     }
 
-    // -------------------------
-    // CHECK PRODUCT IN WISHLIST
-    // -------------------------
     @Override
     public boolean isProductInWishlist(Long userId, Long productId) {
         return wishlistRepository
@@ -95,9 +81,7 @@ public class WishlistServiceImpl implements WishlistService {
                 .isPresent();
     }
 
-    // -------------------------
-    // RESPONSE MAPPER
-    // -------------------------
+
     private WishlistResponse buildResponse(Wishlist wishlist) {
 
         Product product = wishlist.getProduct();
@@ -110,16 +94,14 @@ public class WishlistServiceImpl implements WishlistService {
         response.setProductName(product.getName());
         response.setAddedAt(wishlist.getCreatedAt());
 
-        // PRODUCT IMAGE
         if (product.getImages() != null && !product.getImages().isEmpty()) {
             response.setImage(product.getImages().get(0).getImagePath());
         }
 
-        // PRODUCT VARIANT (price, size, color)
         if (product.getVariants() != null && !product.getVariants().isEmpty()) {
             ProductVariant variant = product.getVariants().get(0);
 
-            response.setMrpPrice(variant.getMrpPrice());
+            response.setMrpPrice(variant.getSellingPrice());
             response.setSellingPrice(variant.getSellingPrice());
             response.setSize(variant.getSize());
             response.setColor(variant.getColor());
