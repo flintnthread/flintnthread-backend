@@ -1,19 +1,16 @@
 package com.ecommerce.authdemo.service;
 
 
-import com.ecommerce.authdemo.dto.CheckoutRequest;
-import com.ecommerce.authdemo.dto.OrderResponse;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import com.ecommerce.authdemo.dto.OrderResponseDTO;
+import com.ecommerce.authdemo.dto.PlaceOrderRequestDTO;
 
-    public interface OrderService {
+import java.util.List;
 
-        OrderResponse placeOrder(Long userId, CheckoutRequest request);
+public interface OrderService {
 
-        OrderResponse getOrder(String orderNumber);
+    OrderResponseDTO placeOrder(PlaceOrderRequestDTO dto);
 
-        Page<OrderResponse> getUserOrders(Long userId, Pageable pageable);
+    List<OrderResponseDTO> getUserOrders();
 
-        void cancelOrder(String orderNumber);
-    }
-
+    OrderResponseDTO getOrderDetails(Long orderId);
+}

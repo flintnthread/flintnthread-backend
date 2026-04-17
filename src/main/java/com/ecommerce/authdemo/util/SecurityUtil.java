@@ -7,26 +7,26 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-    @Component
-    @RequiredArgsConstructor
-    public class SecurityUtil {
+@Component
+@RequiredArgsConstructor
+public class SecurityUtil {
 
-        private final UserRepository userRepository;
+    private final UserRepository userRepository;
 
-        /**
-         * Get currently logged-in user using JWT (email/username)
-         */
-        public User getCurrentUser() {
+    public User getCurrentUser() {
 
-            String principal = SecurityContextHolder
-                    .getContext()
-                    .getAuthentication()
-                    .getName();
+        String principal = SecurityContextHolder
+                .getContext()
+                .getAuthentication()
+                .getName();
 
-            return userRepository.findByEmail(principal)
-                    .orElseThrow(() ->
-                            new ResourceNotFoundException("User not found with email: " + principal)
-                    );
-        }
+        return userRepository.findByEmail(principal)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("User not found with email: " + principal)
+                );
+    }
+    public Long getCurrentUserId() {
+        return getCurrentUser().getId();
     }
 
+}

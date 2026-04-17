@@ -3,81 +3,73 @@ package com.ecommerce.authdemo.controller;
 import com.ecommerce.authdemo.dto.*;
 import com.ecommerce.authdemo.service.ProductService;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/products")
+@RequiredArgsConstructor
 public class ProductController {
 
     private final ProductService productService;
 
-    public ProductController(ProductService productService) {
-        this.productService = productService;
+    @PostMapping
+    public ProductDTO create(@RequestBody ProductDTO dto) {
+        return productService.createProduct(dto);
     }
 
-    // CATEGORY PRODUCTS
-    @GetMapping("/category/{id}")
-    public List<ProductListDTO> getProductsByCategory(@PathVariable Long id) {
-        return productService.getProductsByCategory(id);
-    }
-
-    // SUBCATEGORY PRODUCTS
-    @GetMapping("/subcategory/{id}")
-    public List<ProductListDTO> getProductsBySubCategory(@PathVariable Long id) {
-        return productService.getProductsBySubCategory(id);
-    }
-
-    // PRODUCT DETAILS
     @GetMapping("/{id}")
-    public ProductDTO getProduct(@PathVariable Long id) {
+    public ProductDTO get(@PathVariable Long id) {
         return productService.getProduct(id);
     }
 
-    // SEARCH PRODUCTS
+    @GetMapping
+    public Page<ProductDTO> all(Pageable pageable) {
+        return productService.getAllProducts(pageable);
+    }
+
+    @GetMapping("/category/{id}")
+    public Page<ProductDTO> byCategory(@PathVariable Long id, Pageable pageable) {
+        return productService.getByCategory(id, pageable);
+    }
+
+    @GetMapping("/recent")
+    public List<ProductDTO> recent() {
+        return productService.getRecentProducts();
+    }
+
+    @GetMapping("/popular")
+    public List<ProductDTO> popular() {
+        return productService.getPopularProducts();
+    }
+
+    @GetMapping("/trending")
+    public List<ProductDTO> trending() {
+        return productService.getTrendingProducts();
+    }
+
+    @GetMapping("/related/{id}")
+    public List<ProductDTO> related(@PathVariable Long id) {
+        return productService.getRelatedProducts(id);
+    }
+
     @GetMapping("/search")
-    public List<ProductListDTO> searchProducts(@RequestParam String keyword) {
-        return productService.searchProducts(keyword);
+    public List<ProductDTO> search(@RequestParam String q) {
+        return productService.searchProducts(q);
     }
 
-    // DELIVERY CHECK
-    @GetMapping("/delivery-check")
-    public DeliveryCheckDTO checkDelivery(
-            @RequestParam Long productId,
-            @RequestParam Long pincodeId) {
-
-        return productService.checkDelivery(productId, pincodeId);
-    }
-
-    // SAVE PRODUCT VIEW
     @PostMapping("/view")
-    public void saveProductView(@RequestBody ProductViewDTO dto) {
-        productService.saveProductView(dto);
+    public void trackView(@RequestBody ProductViewDTO dto) {
+        productService.trackView(dto);
     }
 
-    // RECENTLY VIEWED PRODUCTS
-    @GetMapping("/recently-viewed")
-    public List<ProductListDTO> getRecentlyViewed(
-            @RequestParam(required = false) Long userId,
-            @RequestParam(required = false) String sessionId) {
 
-        return productService.getRecentlyViewed(userId, sessionId);
+    @GetMapping("/subcategory/{id}")
+    public List<ProductDTO> bySubCategory(@PathVariable Long id) {
+        return productService.getBySubCategory(id);
     }
-
-    // MOST VIEWED PRODUCTS
-    @GetMapping("/most-viewed")
-    public List<ProductListDTO> getMostViewedProducts() {
-        return productService.getMostViewedProducts();
-    }
-
-    // 🔥 ADVANCED PRODUCT FILTER
-    @PostMapping("/filter")
-    public Page<ProductListDTO> filterProducts(
-            @RequestBody ProductFilterRequestDTO request) {
-
-        return productService.filterProducts(request);
-    }
-
 }

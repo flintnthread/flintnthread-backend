@@ -1,56 +1,53 @@
 package com.ecommerce.authdemo.controller;
 
-
-import com.ecommerce.authdemo.dto.CheckoutRequest;
-import com.ecommerce.authdemo.dto.OrderResponse;
+import com.ecommerce.authdemo.dto.ApiResponse;
+import com.ecommerce.authdemo.dto.OrderResponseDTO;
+import com.ecommerce.authdemo.dto.PlaceOrderRequestDTO;
 import com.ecommerce.authdemo.service.OrderService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-    @RestController
-    @RequestMapping("/api/orders")
-    @RequiredArgsConstructor
-    public class OrderController {
+import java.util.List;
 
-        private final OrderService orderService;
+@RestController
+@RequestMapping("/api/orders")
+@RequiredArgsConstructor
+public class OrderController {
 
-        // Checkout and place order
-        @PostMapping("/{userId}/checkout")
-        public OrderResponse placeOrder(
-                @PathVariable Long userId,
-                @RequestBody CheckoutRequest request) {
+    private final OrderService orderService;
 
-            return orderService.placeOrder(userId, request);
-        }
+    @PostMapping("/place")
+    public ResponseEntity<ApiResponse<OrderResponseDTO>> placeOrder(
+            @Valid @RequestBody PlaceOrderRequestDTO dto) {
 
-        // Get order details
-        @GetMapping("/{orderNumber}")
-        public OrderResponse getOrder(
-                @PathVariable String orderNumber) {
+        OrderResponseDTO response = orderService.placeOrder(dto);
 
-            return orderService.getOrder(orderNumber);
-        }
-
-        // Get all orders of a user
-        @GetMapping("/user/{userId}")
-        public Page<OrderResponse> getUserOrders(
-                @PathVariable Long userId,
-                Pageable pageable) {
-
-            return orderService.getUserOrders(userId, pageable);
-        }
-
-        // Cancel order
-        @PutMapping("/cancel/{orderNumber}")
-        public void cancelOrder(
-                @PathVariable String orderNumber) {
-
-            orderService.cancelOrder(orderNumber);
-        }
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Order placed successfully", response)
+        );
     }
 
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<OrderResponseDTO>>> getOrders() {
+
+        List<OrderResponseDTO> orders = orderService.getUserOrders();
+
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Orders fetched successfully", orders)
+        );
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<OrderResponseDTO>> getOrderDetails(
+            @PathVariable Long id) {
+
+        OrderResponseDTO order = orderService.getOrderDetails(id);
+
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Order details fetched", order)
+        );
+    }
+}
