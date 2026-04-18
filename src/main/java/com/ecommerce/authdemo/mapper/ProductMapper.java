@@ -4,7 +4,9 @@ import com.ecommerce.authdemo.dto.ProductDTO;
 import com.ecommerce.authdemo.dto.ProductImageDTO;
 import com.ecommerce.authdemo.dto.ProductVariantDTO;
 import com.ecommerce.authdemo.entity.Product;
+import com.ecommerce.authdemo.entity.ProductImage;
 import com.ecommerce.authdemo.entity.ProductVariant;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -12,6 +14,29 @@ import java.util.stream.Collectors;
 
 @Component
 public class ProductMapper {
+
+    private final String mediaPublicBaseUrl;
+
+    public ProductMapper(@Value("${app.media.public-base-url:}") String mediaPublicBaseUrl) {
+        this.mediaPublicBaseUrl = mediaPublicBaseUrl == null ? "" : mediaPublicBaseUrl.trim();
+    }
+
+    private String resolveImageUrl(String storedPath) {
+        if (storedPath == null || storedPath.isBlank()) {
+            return null;
+        }
+        if (storedPath.startsWith("http://") || storedPath.startsWith("https://")) {
+            return storedPath;
+        }
+        if (mediaPublicBaseUrl.isEmpty()) {
+            return null;
+        }
+        String base = mediaPublicBaseUrl.endsWith("/")
+                ? mediaPublicBaseUrl.substring(0, mediaPublicBaseUrl.length() - 1)
+                : mediaPublicBaseUrl;
+        String path = storedPath.startsWith("/") ? storedPath : "/" + storedPath;
+        return base + path;
+    }
 
     public ProductDTO toDTO(Product p) {
 
@@ -98,17 +123,26 @@ public class ProductMapper {
 
             List<ProductImageDTO> imageDTOs = p.getImages()
                     .stream()
-                    .map(img -> {
-                        ProductImageDTO im = new ProductImageDTO();
-                        im.setImagePath(img.getImagePath());
-                        return im;
-                    })
+                    .map(this::toImageDTO)
                     .collect(Collectors.toList());
 
             dto.setImages(imageDTOs);
         }
 
         return dto;
+    }
+
+    private ProductImageDTO toImageDTO(ProductImage img) {
+        ProductImageDTO im = new ProductImageDTO();
+        im.setId(img.getId());
+        if (img.getProduct() != null) {
+            im.setProductId(img.getProduct().getId());
+        }
+        im.setImagePath(img.getImagePath());
+        im.setImageUrl(resolveImageUrl(img.getImagePath()));
+        im.setIsPrimary(img.getIsPrimary());
+        im.setSortOrder(img.getSortOrder());
+        return im;
     }
 
     // ------------------------
