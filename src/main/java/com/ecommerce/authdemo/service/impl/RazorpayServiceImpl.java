@@ -7,30 +7,60 @@ import com.ecommerce.authdemo.repository.RazorpayConfigRepository;
 import com.ecommerce.authdemo.service.RazorpayService;
 import com.razorpay.*;
 
-import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 
 @Service
-@RequiredArgsConstructor
 public class RazorpayServiceImpl implements RazorpayService {
 
     private final RazorpayConfigRepository configRepo;
     private final PaymentTransactionRepository paymentTransactionRepo;
+    private final String keyIdProp;
+    private final String keySecretProp;
+
+    public RazorpayServiceImpl(
+            RazorpayConfigRepository configRepo,
+            PaymentTransactionRepository paymentTransactionRepo,
+            @Value("${razorpay.key_id:}") String keyIdProp,
+            @Value("${razorpay.key_secret:}") String keySecretProp) {
+        this.configRepo = configRepo;
+        this.paymentTransactionRepo = paymentTransactionRepo;
+        this.keyIdProp = keyIdProp;
+        this.keySecretProp = keySecretProp;
+    }
+
+    private String resolveKeyId() {
+        if (StringUtils.hasText(keyIdProp)) {
+            return keyIdProp.trim();
+        }
+        return configRepo.findTopByOrderByIdDesc()
+                .map(RazorpayConfig::getKeyId)
+                .filter(StringUtils::hasText)
+                .orElseThrow(() -> new RuntimeException("Set razorpay.key_id in application.properties or add razorpay_config row"));
+    }
+
+    private String resolveKeySecret() {
+        if (StringUtils.hasText(keySecretProp)) {
+            return keySecretProp.trim();
+        }
+        return configRepo.findTopByOrderByIdDesc()
+                .map(RazorpayConfig::getKeySecret)
+                .filter(StringUtils::hasText)
+                .orElseThrow(() -> new RuntimeException("Set razorpay.key_secret in application.properties or add razorpay_config row"));
+    }
 
     // ✅ CREATE ORDER
     @Override
     public JSONObject createOrder(Double amount) {
 
         try {
-            RazorpayConfig config = configRepo.findTopByOrderByIdDesc()
-                    .orElseThrow(() -> new RuntimeException("Razorpay config not found"));
-
             RazorpayClient client = new RazorpayClient(
-                    config.getKeyId(),
-                    config.getKeySecret()
+                    resolveKeyId(),
+                    resolveKeySecret()
             );
 
             JSONObject options = new JSONObject();
@@ -46,6 +76,7 @@ public class RazorpayServiceImpl implements RazorpayService {
                     .transactionId(order.get("id"))
                     .paymentMethod("RAZORPAY")
                     .amount(BigDecimal.valueOf(amount))
+                    .currency("INR")
                     .status("CREATED")
                     .responseData(order.toString())
                     .build();
@@ -64,12 +95,9 @@ public class RazorpayServiceImpl implements RazorpayService {
     public boolean verifyPayment(String orderId, String paymentId, String signature) {
 
         try {
-            RazorpayConfig config = configRepo.findTopByOrderByIdDesc()
-                    .orElseThrow(() -> new RuntimeException("Razorpay config not found"));
-
             String data = orderId + "|" + paymentId;
 
-            boolean isValid = Utils.verifySignature(data, signature, config.getKeySecret());
+            boolean isValid = Utils.verifySignature(data, signature, resolveKeySecret());
 
             if (isValid) {
 
