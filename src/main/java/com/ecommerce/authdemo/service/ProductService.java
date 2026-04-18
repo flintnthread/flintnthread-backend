@@ -35,4 +35,13 @@ public interface ProductService {
     List<ProductDTO> getBySubCategory(Long subCategoryId);
 
 
+
+
+    List<ProductDTO> getTopSellingPriceProducts();
+
+    List<ProductDTO> getTopProductsByCategory(Long categoryId);
+
+    List<ProductDTO> getTopDiscountProducts();
+
+
 }
