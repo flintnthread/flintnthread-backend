@@ -9,6 +9,7 @@ import com.ecommerce.authdemo.entity.ProductVariant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -73,10 +74,9 @@ public class ProductMapper {
         dto.setDeliveryTimeMax(p.getDeliveryTimeMax());
 
         // ------------------------
-        // VARIANTS (SAFE)
+        // VARIANTS (always non-null for list/detail APIs)
         // ------------------------
         if (p.getVariants() != null && !p.getVariants().isEmpty()) {
-
             List<ProductVariantDTO> variantDTOs = p.getVariants()
                     .stream()
                     .map(v -> {
@@ -84,7 +84,6 @@ public class ProductMapper {
 
                         vd.setId(v.getId());
 
-                        // SAFE productId mapping
                         if (v.getProduct() != null) {
                             vd.setProductId(v.getProduct().getId());
                         }
@@ -114,19 +113,22 @@ public class ProductMapper {
                     .collect(Collectors.toList());
 
             dto.setVariants(variantDTOs);
+        } else {
+            dto.setVariants(Collections.emptyList());
         }
 
         // ------------------------
-        // IMAGES (SAFE)
+        // IMAGES (always non-null; imageUrl from app.media.public-base-url)
         // ------------------------
         if (p.getImages() != null && !p.getImages().isEmpty()) {
-
             List<ProductImageDTO> imageDTOs = p.getImages()
                     .stream()
                     .map(this::toImageDTO)
                     .collect(Collectors.toList());
 
             dto.setImages(imageDTOs);
+        } else {
+            dto.setImages(Collections.emptyList());
         }
 
         return dto;
