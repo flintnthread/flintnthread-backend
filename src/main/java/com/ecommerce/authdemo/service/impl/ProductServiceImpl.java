@@ -134,4 +134,31 @@ public class ProductServiceImpl implements ProductService {
                 .map(mapper::toDTO)
                 .toList();
     }
+
+    @Override
+    public List<ProductDTO> getTopSellingPriceProducts() {
+        return productRepo.findTopSellingProducts()
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getTopProductsByCategory(Long categoryId) {
+        return productRepo.findTopProductsByCategory(categoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+
+    @Override
+    public List<ProductDTO> getTopDiscountProducts() {
+
+        return productRepo.findTopDiscountProducts()
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
 }
