@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
         private BigDecimal amount;
 
         @Column(name = "currency", nullable = false, length = 10)
+        @Builder.Default
         private String currency = "INR";
 
         @Column(name = "status", nullable = false, length = 50)

@@ -1,3 +1,4 @@
+
 package com.ecommerce.authdemo.security;
 
 import org.springframework.context.annotation.Bean;
@@ -87,6 +88,12 @@ public class SecurityConfig {
                         // PUBLIC SEARCH APIs  ⭐ ADDED
                         // --------------------------------
                         .requestMatchers("/api/search/**")
+                        .permitAll()
+
+                        // --------------------------------
+                        // PAYMENT (Razorpay) — Postman / checkout without JWT
+                        // --------------------------------
+                        .requestMatchers("/api/payment/**")
                         .permitAll()
 
                         // --------------------------------
