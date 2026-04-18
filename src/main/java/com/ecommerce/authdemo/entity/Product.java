@@ -3,6 +3,7 @@ package com.ecommerce.authdemo.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.BatchSize;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
@@ -65,12 +66,17 @@ public class Product {
     // RELATIONS
     // ------------------------
 
+    @BatchSize(size = 32)
+    @OrderBy("id ASC")
     @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
     private List<ProductVariant> variants;
 
+    @BatchSize(size = 32)
+    @OrderBy("sortOrder ASC, id ASC")
     @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
     private List<ProductImage> images;
 
+    @BatchSize(size = 32)
     @OneToMany(mappedBy = "product", fetch = FetchType.LAZY)
     private List<ProductView> views;
 }
