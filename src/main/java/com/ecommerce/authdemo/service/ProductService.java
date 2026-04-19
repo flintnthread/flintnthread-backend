@@ -43,5 +43,6 @@ public interface ProductService {
 
     List<ProductDTO> getTopDiscountProducts();
 
+    List<ProductDTO> getByMainCategory(Long mainCategoryId);
 
 }

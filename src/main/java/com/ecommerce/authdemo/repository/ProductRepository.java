@@ -103,4 +103,26 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     LIMIT 10
 """, nativeQuery = true)
     List<Product> findTopDiscountProducts();
+
+    // ---------------- PRODUCTS BY MAIN CATEGORY (INCLUDING SUBCATEGORIES) ----------------
+    @Query(value = """
+        SELECT DISTINCT p.* 
+        FROM products p
+        WHERE p.category_id = :mainCategoryId
+        OR p.category_id IN (
+            SELECT c.id FROM categories c WHERE c.parent_id = :mainCategoryId
+        )
+    """, nativeQuery = true)
+    List<Product> findByMainCategory(@Param("mainCategoryId") Long mainCategoryId);
+
+    @Query(value = """
+        SELECT DISTINCT p.* 
+        FROM products p
+        LEFT JOIN product_variants v ON p.id = v.product_id
+        WHERE p.category_id = :mainCategoryId
+        OR p.category_id IN (
+            SELECT c.id FROM categories c WHERE c.parent_id = :mainCategoryId
+        )
+    """, nativeQuery = true)
+    List<Product> findByMainCategoryFull(@Param("mainCategoryId") Long mainCategoryId);
 }
