@@ -91,4 +91,9 @@ public class ProductController {
     public List<ProductDTO> getTopDiscountProducts() {
         return productService.getTopDiscountProducts();
     }
+
+    @GetMapping("/main-category/{mainCategoryId}")
+    public List<ProductDTO> getByMainCategory(@PathVariable Long mainCategoryId) {
+        return productService.getByMainCategory(mainCategoryId);
+    }
 }

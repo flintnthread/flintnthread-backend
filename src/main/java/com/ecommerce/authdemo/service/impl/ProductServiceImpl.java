@@ -165,4 +165,12 @@ public class ProductServiceImpl implements ProductService {
                 .toList();
     }
 
+    @Override
+    public List<ProductDTO> getByMainCategory(Long mainCategoryId) {
+        return productRepo.findByMainCategoryFull(mainCategoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
 }
