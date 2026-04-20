@@ -165,12 +165,14 @@ public class OrderServiceImpl implements OrderService {
                 .totalAmount(subtotal.doubleValue())
                 .shippingAmount(shippingAmount.doubleValue())
                 .discountAmount(discountAmount.doubleValue())
+                .taxAmount(0.0)
                 .finalAmount(finalAmount.doubleValue())
                 .paymentMethod(dto.getPaymentMethod())
                 .paymentStatus("pending")
                 .orderStatus("processing")
                 .shippingName(address.getName())
                 .shippingPhone(address.getPhone())
+                .shippingEmail(address.getEmail())
                 .shippingAddress1(address.getAddressLine1())
                 .shippingCity(address.getCity())
                 .shippingState(address.getState())
@@ -209,7 +211,7 @@ public class OrderServiceImpl implements OrderService {
     private OrderItemDTO buildOrderItemDTO(OrderItem item) {
         return OrderItemDTO.builder()
                 .productId(item.getProductId())
-                .productName(item.getProductName() != null ? item.getProductName() : "Product " + item.getProductId())
+                .productName("Product " + item.getProductId())
                 .quantity(item.getQuantity())
                 .price(item.getPrice())
                 .total(item.getTotal())
@@ -245,7 +247,6 @@ public class OrderServiceImpl implements OrderService {
                 .finalAmount(order.getFinalAmount())
                 .totalItems(items.size())
                 .firstProductImage(items.isEmpty() ? null : items.get(0).getProductImagePath())
-                .trackingNumber(order.getTrackingNumber())
                 .createdDate(formatDateTime(order.getCreatedAt()))
                 .build();
     }
@@ -263,7 +264,6 @@ public class OrderServiceImpl implements OrderService {
                 .paymentMethod(order.getPaymentMethod())
                 .items(itemDTOList)
                 .shippingAddress(buildShippingAddress(order))
-                .trackingNumber(order.getTrackingNumber())
                 .createdDate(formatDateTime(order.getCreatedAt()))
                 .build();
     }

@@ -23,8 +23,7 @@ public class OrderResponseDTO {
 
     private Integer totalItems;
     private String firstProductImage;
-    private String trackingNumber;
-    private String createdDate;
+        private String createdDate;
 
     private String shippingAddress;
 

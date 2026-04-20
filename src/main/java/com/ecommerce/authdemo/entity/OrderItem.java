@@ -39,9 +39,7 @@ public class OrderItem {
     @Column(name = "status")
     private String status;
 
-    @Column(name = "product_name")
-    private String productName;
-
+    
     @Column(name = "product_image_path")
     private String productImagePath;
 

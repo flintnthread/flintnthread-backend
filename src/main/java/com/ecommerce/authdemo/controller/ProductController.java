@@ -192,4 +192,24 @@ public class ProductController {
     public ProductDTO get(@PathVariable Long id) {
         return productService.getProduct(id);
     }
+
+    @GetMapping("/sizes")
+    public List<String> getAllSizes() {
+        return productService.getAllSizes();
+    }
+
+    @GetMapping("/colors")
+    public List<String> getAllColors() {
+        return productService.getAllColors();
+    }
+
+    @GetMapping("/{productId}/sizes")
+    public List<String> getSizesByProductId(@PathVariable Long productId) {
+        return productService.getSizesByProductId(productId);
+    }
+
+    @GetMapping("/{productId}/colors")
+    public List<String> getColorsByProductId(@PathVariable Long productId) {
+        return productService.getColorsByProductId(productId);
+    }
 }

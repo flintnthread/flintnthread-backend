@@ -54,6 +54,9 @@ public class Order {
     @Column(name = "shipping_phone")
     private String shippingPhone;
 
+    @Column(name = "shipping_email")
+    private String shippingEmail;
+
     @Column(name = "shipping_address1")
     private String shippingAddress1;
 
@@ -69,12 +72,8 @@ public class Order {
     @Column(name = "address_id")
     private Long addressId;
 
-    @Column(name = "tracking_number")
-    private String trackingNumber;
-
-    @Column(name = "courier_name")
-    private String courierName;
-
+    
+    
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
