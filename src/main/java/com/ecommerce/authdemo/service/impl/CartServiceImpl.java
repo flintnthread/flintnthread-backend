@@ -2,12 +2,15 @@ package com.ecommerce.authdemo.service.impl;
 
 import com.ecommerce.authdemo.dto.*;
 import com.ecommerce.authdemo.entity.Cart;
-import com.ecommerce.authdemo.entity.CartItem;
-import com.ecommerce.authdemo.repository.CartItemRepository;
+import com.ecommerce.authdemo.entity.User;
+import com.ecommerce.authdemo.exception.ResourceNotFoundException;
+import com.ecommerce.authdemo.exception.CartException;
 import com.ecommerce.authdemo.repository.CartRepository;
+import com.ecommerce.authdemo.repository.UserRepository;
 import com.ecommerce.authdemo.service.CartService;
 import com.ecommerce.authdemo.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,190 +20,156 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CartServiceImpl implements CartService {
 
     private final CartRepository cartRepository;
-    private final CartItemRepository cartItemRepository;
     private final SecurityUtil securityUtil;
+    private final UserRepository userRepository;
 
-    // =============================
-    // 🔥 ADD TO CART
-    // =============================
     @Override
     @Transactional
     public CartResponseDTO addToCart(AddToCartDTO dto) {
+        log.info("Adding item to cart: productId={}, variantId={}, quantity={}", 
+                dto.getProductId(), dto.getVariantId(), dto.getQuantity());
+        
+        validateAddToCartRequest(dto);
+        
+        Long userId = securityUtil.getCurrentUserId();
+        BigDecimal productPrice = getProductPrice(dto.getProductId());
+        
+        // Check if item already exists in cart
+        Optional<Cart> existingCart = cartRepository.findByUser_IdAndProductIdAndVariantId(
+                userId, dto.getProductId(), dto.getVariantId());
 
-        Long userId = securityUtil.getCurrentUser().getId();
-
-        Cart cart = cartRepository.findByUserId(userId)
-                .orElseGet(() -> createCart(userId));
-
-        Optional<CartItem> existingItem =
-                cartItemRepository.findByCartIdAndProductIdAndVariantId(
-                        cart.getId(), dto.getProductId(), dto.getVariantId()
-                );
-
-        if (existingItem.isPresent()) {
-
-            CartItem item = existingItem.get();
-            item.setQuantity(item.getQuantity() + dto.getQuantity());
-            item.setTotalPrice(item.getPrice()
-                    .multiply(BigDecimal.valueOf(item.getQuantity())));
-
-            cartItemRepository.save(item);
-
+        if (existingCart.isPresent()) {
+            Cart cart = existingCart.get();
+            int newQuantity = cart.getQuantity() + dto.getQuantity();
+            validateQuantity(newQuantity);
+            cart.setQuantity(newQuantity);
+            cart.setTotalAmount(productPrice.multiply(BigDecimal.valueOf(newQuantity)));
+            cart.setFinalAmount(cart.getTotalAmount().subtract(cart.getDiscountAmount()).add(cart.getShippingAmount()));
+            cartRepository.save(cart);
+            log.info("Updated existing cart item: cartId={}, newQuantity={}", cart.getId(), newQuantity);
         } else {
-
-            CartItem item = new CartItem();
-            item.setCart(cart);
-            item.setProductId(dto.getProductId());
-            item.setVariantId(dto.getVariantId());
-            item.setQuantity(dto.getQuantity());
-
-            // 🔥 TEMP PRICE (replace with product service)
-            BigDecimal price = BigDecimal.valueOf(399);
-
-            item.setPrice(price);
-            item.setTotalPrice(price.multiply(BigDecimal.valueOf(dto.getQuantity())));
-
-            cartItemRepository.save(item);
+            Cart newCart = createCart(userId, dto.getProductId(), dto.getVariantId(), dto.getQuantity(), productPrice);
+            log.info("Created new cart item: cartId={}", newCart.getId());
         }
 
-        return buildCartResponse(cart);
+        // Get updated cart items
+        List<Cart> cartItems = cartRepository.findAllByUser_Id(userId);
+        return buildCartResponse(cartItems);
     }
 
-    // =============================
-    // 🔥 GET CART (UPDATED)
-    // =============================
     @Override
     public CartResponseDTO getCart() {
-
-        Long userId = securityUtil.getCurrentUser().getId();
-
-        Cart cart = cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
-
-        return buildCartResponse(cart);
+        Long userId = securityUtil.getCurrentUserId();
+        List<Cart> cartItems = cartRepository.findAllByUser_Id(userId);
+        return buildCartResponse(cartItems);
     }
 
-    // =============================
-    // 🔥 UPDATE QTY
-    // =============================
     @Override
+    @Transactional
     public CartResponseDTO updateQuantity(Long itemId, Integer quantity) {
-
-        CartItem item = cartItemRepository.findById(itemId)
-                .orElseThrow(() -> new RuntimeException("Item not found"));
-
-        item.setQuantity(quantity);
-        item.setTotalPrice(item.getPrice()
-                .multiply(BigDecimal.valueOf(quantity)));
-
-        cartItemRepository.save(item);
-
-        return buildCartResponse(item.getCart());
-    }
-
-    // =============================
-    // 🔥 REMOVE ITEM
-    // =============================
-    @Override
-    public CartResponseDTO removeItem(Long itemId) {
-
-        CartItem item = cartItemRepository.findById(itemId)
-                .orElseThrow(() -> new RuntimeException("Item not found"));
-
-        Cart cart = item.getCart();
-
-        cartItemRepository.delete(item);
-
-        return buildCartResponse(cart);
-    }
-
-    // =============================
-    // 🔥 CLEAR CART
-    // =============================
-    @Override
-    public void clearCart() {
-
-        Cart cart = getCartEntity();
-
-        List<CartItem> items = cartItemRepository.findByCartId(cart.getId());
-
-        cartItemRepository.deleteAll(items);
-
-        cart.setTotalAmount(BigDecimal.ZERO);
-        cart.setFinalAmount(BigDecimal.ZERO);
-
+        log.info("Updating cart item quantity: itemId={}, newQuantity={}", itemId, quantity);
+        
+        validateQuantity(quantity);
+        
+        Cart cart = cartRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
+        
+        validateCartOwnership(cart);
+        
+        BigDecimal productPrice = getProductPrice(cart.getProductId());
+        cart.setQuantity(quantity);
+        cart.setTotalAmount(productPrice.multiply(BigDecimal.valueOf(quantity)));
+        cart.setFinalAmount(cart.getTotalAmount().subtract(cart.getDiscountAmount()).add(cart.getShippingAmount()));
         cartRepository.save(cart);
+        
+        List<Cart> cartItems = cartRepository.findAllByUser_Id(securityUtil.getCurrentUserId());
+        return buildCartResponse(cartItems);
     }
 
-    // =============================
-    // 🔥 APPLY COUPON
-    // =============================
     @Override
-    public CartResponseDTO applyCoupon(String code) {
-
-        if (!code.equalsIgnoreCase("SAVE500")) {
-            throw new RuntimeException("Invalid coupon");
-        }
-
-        Cart cart = getCartEntity();
-
-        return buildCartResponse(cart, BigDecimal.valueOf(500));
+    @Transactional
+    public CartResponseDTO removeItem(Long itemId) {
+        log.info("Removing cart item: itemId={}", itemId);
+        
+        Cart cart = cartRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
+        
+        validateCartOwnership(cart);
+        
+        cartRepository.delete(cart);
+        
+        List<Cart> cartItems = cartRepository.findAllByUser_Id(securityUtil.getCurrentUserId());
+        return buildCartResponse(cartItems);
     }
 
-    // =============================
-    // 🔥 CART COUNT
-    // =============================
+    @Override
+    @Transactional
+    public void clearCart() {
+        log.info("Clearing cart for user");
+        
+        Long userId = securityUtil.getCurrentUserId();
+        List<Cart> cartItems = cartRepository.findAllByUser_Id(userId);
+        
+        cartRepository.deleteAll(cartItems);
+    }
+
     @Override
     public Integer getCartCount() {
-
-        Cart cart = getCartEntity();
-
-        return cartItemRepository.findByCartId(cart.getId()).size();
+        Long userId = securityUtil.getCurrentUserId();
+        return cartRepository.findAllByUser_Id(userId).size();
     }
 
-    // =============================
-    // 🔥 BUILD RESPONSE (MAIN LOGIC)
-    // =============================
-    private CartResponseDTO buildCartResponse(Cart cart) {
-        return buildCartResponse(cart, BigDecimal.ZERO);
+    @Override
+    public CartResponseDTO applyCoupon(String code) {
+        if (!code.equalsIgnoreCase("SAVE500")) {
+            throw new CartException("Invalid coupon code");
+        }
+
+        Long userId = securityUtil.getCurrentUserId();
+        List<Cart> cartItems = cartRepository.findAllByUser_Id(userId);
+        
+        for (Cart cart : cartItems) {
+            cart.setCouponCode(code);
+            cart.setDiscountAmount(BigDecimal.valueOf(500));
+            cart.setFinalAmount(cart.getTotalAmount().subtract(cart.getDiscountAmount()).add(cart.getShippingAmount()));
+            cartRepository.save(cart);
+        }
+
+        return buildCartResponse(cartItems);
     }
 
-    private CartResponseDTO buildCartResponse(Cart cart, BigDecimal discount) {
-
-        List<CartItem> items = cartItemRepository.findByCartId(cart.getId());
-
-        List<CartItemResponseDTO> itemDTOs = items.stream().map(item -> {
-
+    private CartResponseDTO buildCartResponse(List<Cart> cartItems) {
+        List<CartItemResponseDTO> itemDTOs = cartItems.stream().map(cart -> {
             CartItemResponseDTO dto = new CartItemResponseDTO();
-
-            dto.setItemId(item.getId());
-            dto.setProductId(item.getProductId());
-
-            // 🔥 Replace with product table later
-            dto.setName("Product " + item.getProductId());
+            dto.setItemId(cart.getId());
+            dto.setProductId(cart.getProductId());
+            dto.setVariantId(cart.getVariantId());
+            dto.setName("Product " + cart.getProductId());
             dto.setImage("https://via.placeholder.com/150");
-
-            dto.setPrice(item.getPrice());
-            dto.setOriginalPrice(item.getPrice().add(BigDecimal.valueOf(300)));
-
-            dto.setQuantity(item.getQuantity());
-            dto.setTotal(item.getTotalPrice());
-
+            dto.setPrice(cart.getPrice());
+            dto.setOriginalPrice(cart.getPrice().add(BigDecimal.valueOf(300)));
+            dto.setQuantity(cart.getQuantity());
+            dto.setTotal(cart.getTotalAmount());
             return dto;
-
         }).toList();
 
-        // 🔥 CALCULATIONS
-        BigDecimal subtotal = itemDTOs.stream()
-                .map(CartItemResponseDTO::getTotal)
+        BigDecimal subtotal = cartItems.stream()
+                .map(Cart::getTotalAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal delivery = BigDecimal.valueOf(99);
-
-        BigDecimal finalTotal = subtotal.subtract(discount).add(delivery);
+        
+        BigDecimal discount = cartItems.stream()
+                .map(Cart::getDiscountAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal delivery = cartItems.stream()
+                .map(Cart::getShippingAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        BigDecimal finalTotal = subtotal.add(delivery).subtract(discount);
 
         PriceSummaryDTO summary = new PriceSummaryDTO();
         summary.setSubtotal(subtotal);
@@ -211,29 +180,83 @@ public class CartServiceImpl implements CartService {
         CartResponseDTO response = new CartResponseDTO();
         response.setItems(itemDTOs);
         response.setPriceSummary(summary);
-        response.setCouponApplied(discount.compareTo(BigDecimal.ZERO) > 0 ? "SAVE500" : null);
+        response.setCouponApplied(cartItems.isEmpty() ? null : cartItems.get(0).getCouponCode());
 
         return response;
     }
 
-    // =============================
-    // 🔥 HELPERS
-    // =============================
-    private Cart createCart(Long userId) {
-
-        Cart cart = new Cart();
-        cart.setUserId(userId);
-        cart.setTotalAmount(BigDecimal.ZERO);
-        cart.setFinalAmount(BigDecimal.ZERO);
+    private Cart createCart(Long userId, Long productId, Long variantId, Integer quantity, BigDecimal price) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        
+        Cart cart = Cart.builder()
+                .user(user)
+                .sessionId("USER-" + userId)
+                .productId(productId)
+                .variantId(variantId != null ? variantId : 1L)
+                .quantity(quantity != null ? quantity : 1)
+                .price(price != null ? price : BigDecimal.ZERO)
+                .deliveryType(com.ecommerce.authdemo.dto.Enum.DeliveryType.metro_metro)
+                .totalAmount(price != null ? price.multiply(BigDecimal.valueOf(quantity != null ? quantity : 1)) : BigDecimal.ZERO)
+                .discountAmount(BigDecimal.ZERO)
+                .shippingAmount(BigDecimal.ZERO)
+                .finalAmount(price != null ? price.multiply(BigDecimal.valueOf(quantity != null ? quantity : 1)) : BigDecimal.ZERO)
+                .currency("USD")
+                .build();
 
         return cartRepository.save(cart);
     }
 
     private Cart getCartEntity() {
+        Long userId = securityUtil.getCurrentUserId();
+        return getOrCreateCart(userId);
+    }
 
-        Long userId = securityUtil.getCurrentUser().getId();
+    private Cart getOrCreateCart(Long userId) {
+        return cartRepository.findByUser_Id(userId)
+                .orElseGet(() -> createCart(userId, 0L, 1L, 1, BigDecimal.ZERO));
+    }
 
-        return cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Cart not found"));
+    private void validateAddToCartRequest(AddToCartDTO dto) {
+        if (dto == null) {
+            throw new CartException("Add to cart request cannot be null");
+        }
+        if (dto.getProductId() == null || dto.getProductId() <= 0) {
+            throw new CartException("Valid product ID is required");
+        }
+        if (dto.getQuantity() == null || dto.getQuantity() <= 0) {
+            throw new CartException("Quantity must be greater than 0");
+        }
+        validateQuantity(dto.getQuantity());
+    }
+
+    private void validateQuantity(Integer quantity) {
+        if (quantity == null || quantity <= 0) {
+            throw new CartException("Quantity must be greater than 0");
+        }
+        if (quantity > 10) {
+            throw new CartException("Maximum quantity allowed is 10");
+        }
+    }
+
+    private void validateCartOwnership(Cart cart) {
+        Long currentUserId = securityUtil.getCurrentUserId();
+        if (!cart.getUserId().equals(currentUserId)) {
+            throw new CartException("Access denied: You can only modify your own cart");
+        }
+    }
+
+    private BigDecimal getProductPrice(Long productId) {
+        // TODO: Integrate with Product Service to get actual price
+        // For now, return a default price based on product ID
+        return BigDecimal.valueOf(500 + (productId % 100) * 10);
+    }
+
+    private BigDecimal calculateShipping(BigDecimal subtotal) {
+        // Free shipping for orders above $1000
+        if (subtotal.compareTo(BigDecimal.valueOf(1000)) >= 0) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(99);
     }
 }
