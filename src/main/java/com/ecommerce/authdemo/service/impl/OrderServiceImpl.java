@@ -2,6 +2,8 @@ package com.ecommerce.authdemo.service.impl;
 
 import com.ecommerce.authdemo.dto.*;
 import com.ecommerce.authdemo.entity.*;
+import com.ecommerce.authdemo.exception.ResourceNotFoundException;
+import com.ecommerce.authdemo.exception.OrderException;
 import com.ecommerce.authdemo.repository.AddressRepository;
 import com.ecommerce.authdemo.repository.OrderItemRepository;
 import com.ecommerce.authdemo.repository.OrderRepository;
@@ -9,17 +11,19 @@ import com.ecommerce.authdemo.service.CartService;
 import com.ecommerce.authdemo.service.OrderService;
 import com.ecommerce.authdemo.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class OrderServiceImpl implements OrderService {
 
     private final OrderRepository orderRepository;
@@ -31,144 +35,249 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional
     public OrderResponseDTO placeOrder(PlaceOrderRequestDTO dto) {
-
+        log.info("Placing order: paymentMethod={}, addressId={}", dto.getPaymentMethod(), dto.getAddressId());
+        
+        validatePlaceOrderRequest(dto);
+        
         Long userId = securityUtil.getCurrentUserId();
         CartResponseDTO cart = cartService.getCart();
 
         if (cart.getItems() == null || cart.getItems().isEmpty()) {
-            throw new RuntimeException("Cart is empty");
+            throw new OrderException("Cart is empty. Cannot place order.");
         }
 
         Address address = addressRepository.findById(Math.toIntExact(dto.getAddressId()))
-                .orElseThrow(() -> new RuntimeException("Address not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
 
-        double totalAmount = 0;
+        validateAddressOwnership(address);
 
-        for (CartItemResponseDTO item : cart.getItems()) {
-            totalAmount += item.getPrice().doubleValue() * item.getQuantity();
-        }
+        BigDecimal subtotal = cart.getPriceSummary().getSubtotal();
+        BigDecimal shippingAmount = cart.getPriceSummary().getDeliveryCharge();
+        BigDecimal discountAmount = cart.getPriceSummary().getDiscount();
+        BigDecimal finalAmount = cart.getPriceSummary().getFinalTotal();
 
-        double deliveryCharge = 50;
-        double discount = 0;
-        double finalAmount = totalAmount + deliveryCharge - discount;
-
-        Order order = new Order();
-
-        order.setUserId(userId);
-        order.setOrderNumber("ORD" + System.currentTimeMillis());
-
-        order.setTotalAmount(totalAmount);
-        order.setShippingAmount(deliveryCharge);
-        order.setDiscountAmount(discount);
-        order.setFinalAmount(finalAmount);
-
-        order.setPaymentMethod(dto.getPaymentMethod());
-        order.setPaymentStatus("pending");
-        order.setOrderStatus("pending");
-
-        order.setShippingName(address.getName());
-        order.setShippingPhone(address.getPhone());
-        order.setShippingAddress1(address.getAddressLine1());
-        order.setShippingCity(address.getCity());
-        order.setShippingState(address.getState());
-        order.setShippingPincode(address.getPincode());
-
-        order.setAddressId(Long.valueOf(address.getId()));
-        order.setCreatedAt(LocalDateTime.now());
-
+        Order order = createOrder(userId, dto, address, subtotal, shippingAmount, discountAmount, finalAmount);
         order = orderRepository.save(order);
 
-        List<OrderItemDTO> itemDTOList = new ArrayList<>();
-
-        for (CartItemResponseDTO cartItem : cart.getItems()) {
-
-            OrderItem item = new OrderItem();
-
-            item.setOrderId(order.getId());
-            item.setProductId(cartItem.getProductId());
-
-            item.setVariantId(
-                    cartItem.getVariantId() != null ? cartItem.getVariantId() : null
-            );
-
-            item.setQuantity(cartItem.getQuantity());
-
-            BigDecimal price = cartItem.getPrice();
-            BigDecimal total = price.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
-
-            item.setPrice(price.doubleValue());
-            item.setTotal(total.doubleValue());
-
-            item.setStatus("pending");
-            item.setProductImagePath(cartItem.getImage());
-
-            orderItemRepository.save(item);
-
-            itemDTOList.add(OrderItemDTO.builder()
-                    .productId(item.getProductId())
-                    .quantity(item.getQuantity())
-                    .price(item.getPrice())
-                    .total(item.getTotal())
-                    .productImage(item.getProductImagePath())
-                    .build());
-        }
+        List<OrderItemDTO> itemDTOList = createOrderItems(order, cart.getItems());
 
         cartService.clearCart();
+        log.info("Order placed successfully: orderId={}, orderNumber={}", order.getId(), order.getOrderNumber());
 
+        return buildOrderResponse(order, itemDTOList);
+    }
+
+    @Override
+    public List<OrderResponseDTO> getUserOrders(String status) {
+        log.info("Fetching user orders with status: {}", status);
+        
+        Long userId = securityUtil.getCurrentUserId();
+        List<Order> orders;
+
+        if (status == null || status.equalsIgnoreCase("all")) {
+            orders = orderRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        } else {
+            orders = orderRepository.findByUserIdAndOrderStatusOrderByCreatedAtDesc(userId, status.toLowerCase());
+        }
+
+        return orders.stream()
+                .map(this::buildOrderSummaryResponse)
+                .toList();
+    }
+
+    @Override
+    public OrderResponseDTO getOrderDetails(Long orderId) {
+        log.info("Fetching order details: orderId={}", orderId);
+        
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        validateOrderOwnership(order);
+
+        List<OrderItem> items = orderItemRepository.findByOrderId(orderId);
+        List<OrderItemDTO> itemDTOList = items.stream()
+                .map(this::buildOrderItemDTO)
+                .toList();
+
+        return buildDetailedOrderResponse(order, itemDTOList);
+    }
+
+    @Override
+    @Transactional
+    public void cancelOrder(Long orderId) {
+        log.info("Cancelling order: orderId={}", orderId);
+        
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found"));
+
+        validateOrderOwnership(order);
+
+        if (!canCancelOrder(order)) {
+            throw new OrderException("Order cannot be cancelled. Current status: " + order.getOrderStatus());
+        }
+
+        order.setOrderStatus("cancelled");
+        orderRepository.save(order);
+        
+        log.info("Order cancelled successfully: orderId={}", orderId);
+    }
+
+    private void validatePlaceOrderRequest(PlaceOrderRequestDTO dto) {
+        if (dto == null) {
+            throw new OrderException("Place order request cannot be null");
+        }
+        if (dto.getAddressId() == null || dto.getAddressId() <= 0) {
+            throw new OrderException("Valid address ID is required");
+        }
+        if (dto.getPaymentMethod() == null || dto.getPaymentMethod().trim().isEmpty()) {
+            throw new OrderException("Payment method is required");
+        }
+    }
+
+    private void validateAddressOwnership(Address address) {
+        Long currentUserId = securityUtil.getCurrentUserId();
+        if (!address.getUserId().equals(currentUserId)) {
+            throw new OrderException("Access denied: You can only use your own addresses");
+        }
+    }
+
+    private void validateOrderOwnership(Order order) {
+        Long currentUserId = securityUtil.getCurrentUserId();
+        if (!order.getUserId().equals(currentUserId)) {
+            throw new OrderException("Access denied: You can only view your own orders");
+        }
+    }
+
+    private boolean canCancelOrder(Order order) {
+        String status = order.getOrderStatus();
+        return !"delivered".equalsIgnoreCase(status) && !"cancelled".equalsIgnoreCase(status);
+    }
+
+    private Order createOrder(Long userId, PlaceOrderRequestDTO dto, Address address,
+                             BigDecimal subtotal, BigDecimal shippingAmount, 
+                             BigDecimal discountAmount, BigDecimal finalAmount) {
+        
+        String orderNumber = generateOrderNumber();
+        
+        return Order.builder()
+                .userId(userId)
+                .orderNumber(orderNumber)
+                .totalAmount(subtotal.doubleValue())
+                .shippingAmount(shippingAmount.doubleValue())
+                .discountAmount(discountAmount.doubleValue())
+                .finalAmount(finalAmount.doubleValue())
+                .paymentMethod(dto.getPaymentMethod())
+                .paymentStatus("pending")
+                .orderStatus("processing")
+                .shippingName(address.getName())
+                .shippingPhone(address.getPhone())
+                .shippingAddress1(address.getAddressLine1())
+                .shippingCity(address.getCity())
+                .shippingState(address.getState())
+                .shippingPincode(address.getPincode())
+                .addressId(Long.valueOf(address.getId()))
+                .createdAt(LocalDateTime.now())
+                .build();
+    }
+
+    private String generateOrderNumber() {
+        return "ORD-" + System.currentTimeMillis();
+    }
+
+    private List<OrderItemDTO> createOrderItems(Order order, List<CartItemResponseDTO> cartItems) {
+        List<OrderItemDTO> itemDTOList = new ArrayList<>();
+
+        for (CartItemResponseDTO cartItem : cartItems) {
+            OrderItem item = OrderItem.builder()
+                    .orderId(order.getId())
+                    .productId(cartItem.getProductId())
+                    .variantId(cartItem.getVariantId())
+                    .quantity(cartItem.getQuantity())
+                    .price(cartItem.getPrice().doubleValue())
+                    .total(cartItem.getTotal().doubleValue())
+                    .status("processing")
+                    .productImagePath(cartItem.getImage())
+                    .build();
+
+            item = orderItemRepository.save(item);
+            itemDTOList.add(buildOrderItemDTO(item));
+        }
+
+        return itemDTOList;
+    }
+
+    private OrderItemDTO buildOrderItemDTO(OrderItem item) {
+        return OrderItemDTO.builder()
+                .productId(item.getProductId())
+                .productName(item.getProductName() != null ? item.getProductName() : "Product " + item.getProductId())
+                .quantity(item.getQuantity())
+                .price(item.getPrice())
+                .total(item.getTotal())
+                .productImage(item.getProductImagePath())
+                .build();
+    }
+
+    private OrderResponseDTO buildOrderResponse(Order order, List<OrderItemDTO> itemDTOList) {
         return OrderResponseDTO.builder()
                 .orderId(order.getId())
                 .orderNumber(order.getOrderNumber())
                 .totalAmount(order.getTotalAmount())
                 .finalAmount(order.getFinalAmount())
-                .paymentStatus(order.getPaymentStatus())
                 .orderStatus(order.getOrderStatus())
+                .paymentStatus(order.getPaymentStatus())
                 .items(itemDTOList)
+                .shippingAmount(order.getShippingAmount())
+                .discountAmount(order.getDiscountAmount())
+                .paymentMethod(order.getPaymentMethod())
+                .createdDate(formatDateTime(order.getCreatedAt()))
+                .shippingAddress(buildShippingAddress(order))
                 .build();
     }
 
-    @Override
-    public List<OrderResponseDTO> getUserOrders() {
-
-        Long userId = securityUtil.getCurrentUserId();
-
-        List<Order> orders = orderRepository.findByUserId(userId);
-
-        return orders.stream()
-                .map(o -> OrderResponseDTO.builder()
-                        .orderId(o.getId())
-                        .orderNumber(o.getOrderNumber())
-                        .finalAmount(o.getFinalAmount())
-                        .orderStatus(o.getOrderStatus())
-                        .paymentStatus(o.getPaymentStatus())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public OrderResponseDTO getOrderDetails(Long orderId) {
-
-        Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
-
-        List<OrderItem> items = orderItemRepository.findByOrderId(orderId);
-
+    private OrderResponseDTO buildOrderSummaryResponse(Order order) {
+        List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
+        
         return OrderResponseDTO.builder()
                 .orderId(order.getId())
                 .orderNumber(order.getOrderNumber())
-                .finalAmount(order.getFinalAmount())
                 .orderStatus(order.getOrderStatus())
                 .paymentStatus(order.getPaymentStatus())
-                .items(
-                        items.stream().map(i ->
-                                OrderItemDTO.builder()
-                                        .productId(i.getProductId())
-                                        .quantity(i.getQuantity())
-                                        .price(i.getPrice())
-                                        .total(i.getTotal())
-                                        .productImage(i.getProductImagePath())
-                                        .build()
-                        ).collect(Collectors.toList()) // ✅ FIXED
-                )
+                .finalAmount(order.getFinalAmount())
+                .totalItems(items.size())
+                .firstProductImage(items.isEmpty() ? null : items.get(0).getProductImagePath())
+                .trackingNumber(order.getTrackingNumber())
+                .createdDate(formatDateTime(order.getCreatedAt()))
                 .build();
+    }
+
+    private OrderResponseDTO buildDetailedOrderResponse(Order order, List<OrderItemDTO> itemDTOList) {
+        return OrderResponseDTO.builder()
+                .orderId(order.getId())
+                .orderNumber(order.getOrderNumber())
+                .orderStatus(order.getOrderStatus())
+                .paymentStatus(order.getPaymentStatus())
+                .totalAmount(order.getTotalAmount())
+                .finalAmount(order.getFinalAmount())
+                .shippingAmount(order.getShippingAmount())
+                .discountAmount(order.getDiscountAmount())
+                .paymentMethod(order.getPaymentMethod())
+                .items(itemDTOList)
+                .shippingAddress(buildShippingAddress(order))
+                .trackingNumber(order.getTrackingNumber())
+                .createdDate(formatDateTime(order.getCreatedAt()))
+                .build();
+    }
+
+    private String buildShippingAddress(Order order) {
+        return String.format("%s, %s, %s - %s",
+                order.getShippingAddress1(),
+                order.getShippingCity(),
+                order.getShippingState(),
+                order.getShippingPincode());
+    }
+
+    private String formatDateTime(LocalDateTime dateTime) {
+        if (dateTime == null) return "";
+        return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 }

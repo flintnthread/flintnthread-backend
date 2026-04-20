@@ -1,13 +1,32 @@
 package com.ecommerce.authdemo.dto;
 
+import jakarta.validation.constraints.*;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 
 @Data
-    public class PlaceOrderRequestDTO {
+@NoArgsConstructor
+@AllArgsConstructor
+public class PlaceOrderRequestDTO {
 
-        private Long addressId;
-        private String paymentMethod; // COD / RAZORPAY
-        private String orderNotes;
+    @NotNull(message = "Address ID is required")
+    @Positive(message = "Address ID must be positive")
+    private Long addressId;
 
-    }
+    @NotBlank(message = "Payment method is required")
+    @Pattern(regexp = "^(credit_card|debit_card|paypal|cash_on_delivery|upi)$", 
+             message = "Invalid payment method")
+    private String paymentMethod;
 
+    @Size(max = 500, message = "Order notes must not exceed 500 characters")
+    private String orderNotes;
+
+    @Pattern(regexp = "^[A-Z0-9]{5,20}$", message = "Invalid coupon code format")
+    private String couponCode;
+
+    private Boolean useWallet = false;
+
+    @Min(value = 0, message = "Wallet amount cannot be negative")
+    private Double walletAmount = 0.0;
+}
