@@ -8,8 +8,9 @@ import java.util.List;
 
 public interface WishlistService {
 
-    WishlistResponse addToWishlist(Long userId, Long productId);
+    WishlistResponse addToWishlist(Long userId, Long productId, Long variantId);
     List<WishlistResponse> getUserWishlist(Long userId);
-    void removeFromWishlist(Long userId, Long productId);
+    void removeFromWishlist(Long userId, Long productId, Long variantId);
     boolean isProductInWishlist(Long userId, Long productId);
+    boolean isProductVariantInWishlist(Long userId, Long productId, Long variantId);
 }

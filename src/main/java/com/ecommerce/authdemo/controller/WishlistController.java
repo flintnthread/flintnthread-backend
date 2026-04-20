@@ -26,27 +26,28 @@ public class WishlistController {
     @PostMapping("/add")
     public WishlistResponse addToWishlist(@RequestBody WishlistRequest request){
         return wishlistService.addToWishlist(
-                request.getUserId(),
-                request.getProductId()
+                null, // userId not needed, using authenticated user
+                request.getProductId(),
+                request.getVariantId()
         );
     }
 
     // -------------------------
     // GET USER WISHLIST
     // -------------------------
-    @GetMapping("/user/{userId}")
-    public List<WishlistResponse> getWishlist(@PathVariable Long userId){
-        return wishlistService.getUserWishlist(userId);
+    @GetMapping("/user")
+    public List<WishlistResponse> getWishlist(){
+        return wishlistService.getUserWishlist(null); // userId not needed, using authenticated user
     }
 
     // -------------------------
     // REMOVE FROM WISHLIST
     // -------------------------
     @DeleteMapping("/remove")
-    public String removeFromWishlist(@RequestParam Long userId,
-                                     @RequestParam Long productId){
+    public String removeFromWishlist(@RequestParam Long productId,
+                                     @RequestParam Long variantId){
 
-        wishlistService.removeFromWishlist(userId, productId);
+        wishlistService.removeFromWishlist(null, productId, variantId); // userId not needed, using authenticated user
         return "Product removed from wishlist";
     }
 
@@ -54,9 +55,18 @@ public class WishlistController {
     // CHECK PRODUCT IN WISHLIST
     // -------------------------
     @GetMapping("/check")
-    public boolean checkWishlist(@RequestParam Long userId,
-                                 @RequestParam Long productId){
+    public boolean checkWishlist(@RequestParam Long productId){
 
-        return wishlistService.isProductInWishlist(userId, productId);
+        return wishlistService.isProductInWishlist(null, productId); // userId not needed, using authenticated user
+    }
+
+    // -------------------------
+    // CHECK PRODUCT VARIANT IN WISHLIST
+    // -------------------------
+    @GetMapping("/check-variant")
+    public boolean checkVariantWishlist(@RequestParam Long productId,
+                                        @RequestParam Long variantId){
+
+        return wishlistService.isProductVariantInWishlist(null, productId, variantId); // userId not needed, using authenticated user
     }
 }
