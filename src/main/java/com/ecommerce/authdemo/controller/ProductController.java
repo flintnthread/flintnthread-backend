@@ -22,14 +22,105 @@ public class ProductController {
         return productService.createProduct(dto);
     }
 
-    @GetMapping("/{id}")
-    public ProductDTO get(@PathVariable Long id) {
-        return productService.getProduct(id);
-    }
-
     @GetMapping
     public Page<ProductDTO> all(Pageable pageable) {
         return productService.getAllProducts(pageable);
+    }
+
+    @PostMapping("/search/filter")
+    public Page<ProductDTO> filterProducts(@RequestBody ProductFilterRequestDTO filterRequest) {
+        return productService.getFilteredProducts(filterRequest);
+    }
+
+    @GetMapping("/search/filter")
+    public Page<ProductDTO> filterProductsGet(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Long subcategoryId,
+            @RequestParam(required = false) Long sellerId,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDirection,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String gender
+    ) {
+        ProductFilterRequestDTO filterRequest = new ProductFilterRequestDTO();
+        
+        // Set search criteria
+        filterRequest.setKeyword(keyword);
+        filterRequest.setCategoryId(categoryId);
+        filterRequest.setSubcategoryId(subcategoryId);
+        filterRequest.setSellerId(sellerId);
+        
+        // Set pagination
+        filterRequest.setPage(page != null ? page : 0);
+        filterRequest.setSize(size != null ? size : 10);
+        
+        // Set sorting
+        filterRequest.setSortBy(sortBy != null ? sortBy : "createdAt");
+        filterRequest.setSortDirection(sortDirection != null ? sortDirection : "desc");
+        
+        // Set gender filter
+        if (gender != null) {
+            filterRequest.setGenders(List.of(gender));
+        }
+        
+        return productService.getFilteredProducts(filterRequest);
+    }
+
+    @GetMapping("/gender/{gender}")
+    public Page<ProductDTO> getByGender(
+            @PathVariable String gender,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDirection
+    ) {
+        ProductFilterRequestDTO filterRequest = new ProductFilterRequestDTO();
+        
+        // Set gender filter
+        filterRequest.setGenders(List.of(gender));
+        
+        // Set category filter if provided
+        if (categoryId != null) {
+            filterRequest.setCategoryId(categoryId);
+        }
+        
+        // Set pagination
+        filterRequest.setPage(page != null ? page : 0);
+        filterRequest.setSize(size != null ? size : 20);
+        
+        // Set sorting
+        filterRequest.setSortBy(sortBy != null ? sortBy : "createdAt");
+        filterRequest.setSortDirection(sortDirection != null ? sortDirection : "desc");
+        
+        return productService.getFilteredProducts(filterRequest);
+    }
+
+    @GetMapping("/filter-products")
+    public Page<ProductDTO> filterProductsSimple(
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) String gender,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size
+    ) {
+        ProductFilterRequestDTO filterRequest = new ProductFilterRequestDTO();
+        
+        if (categoryId != null) {
+            filterRequest.setCategoryId(categoryId);
+        }
+        
+        if (gender != null) {
+            filterRequest.setGenders(List.of(gender));
+        }
+        
+        filterRequest.setPage(page != null ? page : 0);
+        filterRequest.setSize(size != null ? size : 20);
+        filterRequest.setSortBy("createdAt");
+        filterRequest.setSortDirection("desc");
+        
+        return productService.getFilteredProducts(filterRequest);
     }
 
     @GetMapping("/category/{id}")
@@ -95,5 +186,10 @@ public class ProductController {
     @GetMapping("/main-category/{mainCategoryId}")
     public List<ProductDTO> getByMainCategory(@PathVariable Long mainCategoryId) {
         return productService.getByMainCategory(mainCategoryId);
+    }
+
+    @GetMapping("/{id}")
+    public ProductDTO get(@PathVariable Long id) {
+        return productService.getProduct(id);
     }
 }

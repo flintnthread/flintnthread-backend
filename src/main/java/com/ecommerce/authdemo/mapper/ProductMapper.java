@@ -22,7 +22,7 @@ public class ProductMapper {
         this.mediaPublicBaseUrl = mediaPublicBaseUrl == null ? "" : mediaPublicBaseUrl.trim();
     }
 
-    private String resolveImageUrl(String storedPath) {
+    public String resolveImageUrl(String storedPath) {
         if (storedPath == null || storedPath.isBlank()) {
             return null;
         }
@@ -134,7 +134,7 @@ public class ProductMapper {
         return dto;
     }
 
-    private ProductImageDTO toImageDTO(ProductImage img) {
+    public ProductImageDTO toImageDTO(ProductImage img) {
         ProductImageDTO im = new ProductImageDTO();
         im.setId(img.getId());
         if (img.getProduct() != null) {
