@@ -23,6 +23,9 @@ import java.time.LocalDateTime;
          @JoinColumn(name = "product_id")
          private Product product;
 
+         @Column(name = "variant_id")
+         private Long variantId;
+
          @Column(name = "created_at")
         private LocalDateTime createdAt;
 

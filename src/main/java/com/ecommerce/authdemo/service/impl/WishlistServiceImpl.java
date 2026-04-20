@@ -10,34 +10,48 @@ import com.ecommerce.authdemo.entity.User;
 import com.ecommerce.authdemo.entity.Wishlist;
 import com.ecommerce.authdemo.mapper.ProductMapper;
 import com.ecommerce.authdemo.repository.WishlistRepository;
+import com.ecommerce.authdemo.repository.UserRepository;
 import com.ecommerce.authdemo.service.ProductService;
 import com.ecommerce.authdemo.service.WishlistService;
+import com.ecommerce.authdemo.util.SecurityUtil;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 @Transactional
+@Slf4j
 public class WishlistServiceImpl implements WishlistService {
 
     private final WishlistRepository wishlistRepository;
     private final ProductService productService;
     private final ProductMapper productMapper;
+    private final SecurityUtil securityUtil;
+    private final UserRepository userRepository;
 
 
     public WishlistServiceImpl(WishlistRepository wishlistRepository,
                                ProductService productService,
-                               ProductMapper productMapper) {
+                               ProductMapper productMapper,
+                               SecurityUtil securityUtil,
+                               UserRepository userRepository) {
         this.wishlistRepository = wishlistRepository;
         this.productService = productService;
         this.productMapper = productMapper;
+        this.securityUtil = securityUtil;
+        this.userRepository = userRepository;
     }
 
     @Override
-    public WishlistResponse addToWishlist(Long userId, Long productId) {
+    public WishlistResponse addToWishlist(Long userId, Long productId, Long variantId) {
 
+        // Get authenticated user
+        User authenticatedUser = securityUtil.getCurrentUser();
+        
         // Check if product exists before adding to wishlist
         ProductDTO productDTO = productService.getProduct(productId);
         if (productDTO == null) {
@@ -54,30 +68,35 @@ public class WishlistServiceImpl implements WishlistService {
         product.setStatus(productDTO.getStatus());
         product.setSellerId(productDTO.getSellerId());
 
-        Wishlist wishlist = wishlistRepository
-                .findByUserIdAndProductId(userId, productId)
-                .orElseGet(() -> {
-
-                    Wishlist w = new Wishlist();
-
-                    // SET USER
-                    User user = new User();
-                    user.setId(userId);
-                    w.setUser(user);
-
-                    // SET PRODUCT (using actual product found)
-                    w.setProduct(product);
-
-                    return wishlistRepository.save(w);
-                });
-
-        return buildResponse(wishlist);
+        // Check if this product variant is already in the user's wishlist
+        Optional<Wishlist> existingWishlist = wishlistRepository
+                .findByUserIdAndProductIdAndVariantId(authenticatedUser.getId(), productId, variantId);
+        
+        if (existingWishlist.isPresent()) {
+            // Product variant already exists in wishlist, return the existing one
+            log.info("Product variant {} already exists in wishlist for user {}", productId, authenticatedUser.getId());
+            return buildResponse(existingWishlist.get());
+        }
+        
+        // Create new wishlist entry
+        Wishlist newWishlist = new Wishlist();
+        newWishlist.setUser(authenticatedUser);
+        newWishlist.setProduct(product);
+        newWishlist.setVariantId(variantId);
+        
+        Wishlist savedWishlist = wishlistRepository.save(newWishlist);
+        log.info("Added new product variant {} to wishlist for user {}", productId, authenticatedUser.getId());
+        
+        return buildResponse(savedWishlist);
     }
     @Override
     public List<WishlistResponse> getUserWishlist(Long userId) {
 
+        // Get authenticated user
+        User authenticatedUser = securityUtil.getCurrentUser();
+
         List<Wishlist> wishlistItems =
-                wishlistRepository.findWishlistWithProduct(userId);
+                wishlistRepository.findWishlistWithProduct(authenticatedUser.getId());
 
         return wishlistItems.stream()
                 .map(this::buildResponse)
@@ -86,10 +105,13 @@ public class WishlistServiceImpl implements WishlistService {
 
     @Override
     @Transactional
-    public void removeFromWishlist(Long userId, Long productId) {
+    public void removeFromWishlist(Long userId, Long productId, Long variantId) {
+
+        // Get authenticated user
+        User authenticatedUser = securityUtil.getCurrentUser();
 
         Wishlist wishlist = wishlistRepository
-                .findByUserIdAndProductId(userId, productId)
+                .findByUserIdAndProductIdAndVariantId(authenticatedUser.getId(), productId, variantId)
                 .orElseThrow(() -> new RuntimeException("Wishlist item not found"));
 
         wishlistRepository.delete(wishlist);
@@ -97,8 +119,19 @@ public class WishlistServiceImpl implements WishlistService {
 
     @Override
     public boolean isProductInWishlist(Long userId, Long productId) {
+        // Get authenticated user
+        User authenticatedUser = securityUtil.getCurrentUser();
         return wishlistRepository
-                .findByUserIdAndProductId(userId, productId)
+                .findByUserIdAndProductId(authenticatedUser.getId(), productId)
+                .isPresent();
+    }
+
+    @Override
+    public boolean isProductVariantInWishlist(Long userId, Long productId, Long variantId) {
+        // Get authenticated user
+        User authenticatedUser = securityUtil.getCurrentUser();
+        return wishlistRepository
+                .findByUserIdAndProductIdAndVariantId(authenticatedUser.getId(), productId, variantId)
                 .isPresent();
     }
 
@@ -110,8 +143,8 @@ public class WishlistServiceImpl implements WishlistService {
         WishlistResponse response = new WishlistResponse();
 
         response.setWishlistId(wishlist.getId());
-        response.setWishlistId(wishlist.getId());
         response.setProductId(product.getId());
+        response.setVariantId(wishlist.getVariantId());
         response.setProductName(product.getName());
         response.setAddedAt(wishlist.getCreatedAt());
 
@@ -142,7 +175,11 @@ public class WishlistServiceImpl implements WishlistService {
         }
 
         if (product.getVariants() != null && !product.getVariants().isEmpty()) {
-            ProductVariant variant = product.getVariants().iterator().next();
+            // Find the specific variant that matches the variantId in the wishlist
+            ProductVariant variant = product.getVariants().stream()
+                    .filter(v -> v.getId().equals(wishlist.getVariantId()))
+                    .findFirst()
+                    .orElse(product.getVariants().iterator().next()); // Fallback to first variant
 
             response.setMrpPrice(variant.getSellingPrice());
             response.setSellingPrice(variant.getSellingPrice());

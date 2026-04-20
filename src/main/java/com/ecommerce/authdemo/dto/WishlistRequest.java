@@ -6,6 +6,7 @@ public class WishlistRequest {
 
     private Long userId;
     private Long productId;
+    private Long variantId;
 
     public Long getUserId() {
         return userId;
@@ -21,5 +22,13 @@ public class WishlistRequest {
 
     public void setProductId(Long productId) {
         this.productId = productId;
+    }
+
+    public Long getVariantId() {
+        return variantId;
+    }
+
+    public void setVariantId(Long variantId) {
+        this.variantId = variantId;
     }
 }

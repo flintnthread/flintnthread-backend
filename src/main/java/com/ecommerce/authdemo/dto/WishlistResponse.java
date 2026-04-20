@@ -11,6 +11,7 @@ public class WishlistResponse {
 
     private Long wishlistId;
     private Long productId;
+    private Long variantId;
     private String productName;
     private String image; // Primary image (backward compatibility)
     private String imageUrl; // Primary image URL (full URL)
