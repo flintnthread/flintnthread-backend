@@ -6,6 +6,8 @@ import com.ecommerce.authdemo.dto.ProductVariantDTO;
 import com.ecommerce.authdemo.entity.Product;
 import com.ecommerce.authdemo.entity.ProductImage;
 import com.ecommerce.authdemo.entity.ProductVariant;
+import com.ecommerce.authdemo.util.SizeColorMapper;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,13 +16,13 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class ProductMapper {
 
-    private final String mediaPublicBaseUrl;
-
-    public ProductMapper(@Value("${app.media.public-base-url:}") String mediaPublicBaseUrl) {
-        this.mediaPublicBaseUrl = mediaPublicBaseUrl == null ? "" : mediaPublicBaseUrl.trim();
-    }
+    @Value("${app.media.public-base-url:}")
+    private String mediaPublicBaseUrl;
+    
+    private final SizeColorMapper sizeColorMapper;
 
     public String resolveImageUrl(String storedPath) {
         if (storedPath == null || storedPath.isBlank()) {
@@ -88,8 +90,8 @@ public class ProductMapper {
                             vd.setProductId(v.getProduct().getId());
                         }
 
-                        vd.setColor(v.getColor());
-                        vd.setSize(v.getSize());
+                        vd.setColor(sizeColorMapper.getColorName(v.getColor()));
+                        vd.setSize(sizeColorMapper.getSizeName(v.getSize()));
                         vd.setSku(v.getSku());
 
                         vd.setMrpPrice(v.getMrpPrice());

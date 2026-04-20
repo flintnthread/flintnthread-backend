@@ -9,6 +9,7 @@ import com.ecommerce.authdemo.entity.ProductVariant;
 import com.ecommerce.authdemo.entity.User;
 import com.ecommerce.authdemo.entity.Wishlist;
 import com.ecommerce.authdemo.mapper.ProductMapper;
+import com.ecommerce.authdemo.util.SizeColorMapper;
 import com.ecommerce.authdemo.repository.WishlistRepository;
 import com.ecommerce.authdemo.repository.UserRepository;
 import com.ecommerce.authdemo.service.ProductService;
@@ -32,18 +33,21 @@ public class WishlistServiceImpl implements WishlistService {
     private final ProductMapper productMapper;
     private final SecurityUtil securityUtil;
     private final UserRepository userRepository;
+    private final SizeColorMapper sizeColorMapper;
 
 
     public WishlistServiceImpl(WishlistRepository wishlistRepository,
                                ProductService productService,
                                ProductMapper productMapper,
                                SecurityUtil securityUtil,
-                               UserRepository userRepository) {
+                               UserRepository userRepository,
+                               SizeColorMapper sizeColorMapper) {
         this.wishlistRepository = wishlistRepository;
         this.productService = productService;
         this.productMapper = productMapper;
         this.securityUtil = securityUtil;
         this.userRepository = userRepository;
+        this.sizeColorMapper = sizeColorMapper;
     }
 
     @Override
@@ -183,8 +187,8 @@ public class WishlistServiceImpl implements WishlistService {
 
             response.setMrpPrice(variant.getSellingPrice());
             response.setSellingPrice(variant.getSellingPrice());
-            response.setSize(variant.getSize());
-            response.setColor(variant.getColor());
+            response.setSize(sizeColorMapper.getSizeName(variant.getSize()));
+            response.setColor(sizeColorMapper.getColorName(variant.getColor()));
             response.setInStock(variant.getStock() > 0);
         }
 

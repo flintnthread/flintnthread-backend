@@ -48,4 +48,12 @@ public interface ProductService {
 
     Page<ProductDTO> getFilteredProducts(ProductFilterRequestDTO filterRequest);
 
+    List<String> getAllSizes();
+
+    List<String> getAllColors();
+
+    List<String> getSizesByProductId(Long productId);
+
+    List<String> getColorsByProductId(Long productId);
+
 }

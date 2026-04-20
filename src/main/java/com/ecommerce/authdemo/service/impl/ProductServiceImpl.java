@@ -5,6 +5,7 @@ import com.ecommerce.authdemo.entity.Product;
 import com.ecommerce.authdemo.entity.ProductView;
 import com.ecommerce.authdemo.entity.User;
 import com.ecommerce.authdemo.mapper.ProductMapper;
+import com.ecommerce.authdemo.util.SizeColorMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import com.ecommerce.authdemo.repository.*;
@@ -26,6 +27,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductRepository productRepo;
     private final ProductVariantRepository variantRepo;
     private final ProductViewRepository viewRepo;
+    private final SizeColorMapper sizeColorMapper;
 
     private final ProductMapper mapper;
 
@@ -190,6 +192,42 @@ public class ProductServiceImpl implements ProductService {
         
         return productRepo.findAll(spec, pageable)
                 .map(mapper::toDTO);
+    }
+
+    @Override
+    public List<String> getAllSizes() {
+        List<String> sizeIdsOrNames = variantRepo.findAllDistinctSizes();
+        return sizeIdsOrNames.stream()
+                .map(sizeColorMapper::getSizeName)
+                .distinct()
+                .toList();
+    }
+
+    @Override
+    public List<String> getAllColors() {
+        List<String> colorIdsOrNames = variantRepo.findAllDistinctColors();
+        return colorIdsOrNames.stream()
+                .map(sizeColorMapper::getColorName)
+                .distinct()
+                .toList();
+    }
+
+    @Override
+    public List<String> getSizesByProductId(Long productId) {
+        List<String> sizeIdsOrNames = variantRepo.findDistinctSizesByProductId(productId);
+        return sizeIdsOrNames.stream()
+                .map(sizeColorMapper::getSizeName)
+                .distinct()
+                .toList();
+    }
+
+    @Override
+    public List<String> getColorsByProductId(Long productId) {
+        List<String> colorIdsOrNames = variantRepo.findDistinctColorsByProductId(productId);
+        return colorIdsOrNames.stream()
+                .map(sizeColorMapper::getColorName)
+                .distinct()
+                .toList();
     }
 
 }

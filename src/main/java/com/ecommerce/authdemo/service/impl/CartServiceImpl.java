@@ -2,14 +2,17 @@ package com.ecommerce.authdemo.service.impl;
 
 import com.ecommerce.authdemo.dto.*;
 import com.ecommerce.authdemo.entity.Cart;
+import com.ecommerce.authdemo.entity.ProductVariant;
 import com.ecommerce.authdemo.entity.User;
 import com.ecommerce.authdemo.exception.ResourceNotFoundException;
 import com.ecommerce.authdemo.exception.CartException;
 import com.ecommerce.authdemo.repository.CartRepository;
-import com.ecommerce.authdemo.repository.UserRepository;
 import com.ecommerce.authdemo.repository.ProductImageRepository;
+import com.ecommerce.authdemo.repository.ProductVariantRepository;
+import com.ecommerce.authdemo.repository.UserRepository;
 import com.ecommerce.authdemo.service.CartService;
 import com.ecommerce.authdemo.util.SecurityUtil;
+import com.ecommerce.authdemo.util.SizeColorMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,6 +32,8 @@ public class CartServiceImpl implements CartService {
     private final SecurityUtil securityUtil;
     private final UserRepository userRepository;
     private final ProductImageRepository productImageRepository;
+    private final ProductVariantRepository productVariantRepository;
+    private final SizeColorMapper sizeColorMapper;
     
     @Value("${app.media.public-base-url}")
     private String publicBaseUrl;
@@ -166,6 +171,14 @@ public class CartServiceImpl implements CartService {
             dto.setOriginalPrice(cart.getPrice().add(BigDecimal.valueOf(300)));
             dto.setQuantity(cart.getQuantity());
             dto.setTotal(cart.getTotalAmount());
+            
+            // Fetch variant information to get size and color
+            ProductVariant variant = productVariantRepository.findById(cart.getVariantId()).orElse(null);
+            if (variant != null) {
+                dto.setSize(sizeColorMapper.getSizeName(variant.getSize()));
+                dto.setColor(sizeColorMapper.getColorName(variant.getColor()));
+            }
+            
             return dto;
         }).toList();
 
