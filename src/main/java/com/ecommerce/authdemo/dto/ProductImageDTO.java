@@ -11,6 +11,9 @@ import lombok.Data;
 
         private String imagePath;
 
+        /** Absolute URL for clients (Expo, web). Populated when app.media.public-base-url is set. */
+        private String imageUrl;
+
         private Boolean isPrimary;
 
         private Integer sortOrder;

@@ -54,8 +54,8 @@ public class AddressServiceImpl implements AddressService {
             request.setPincode(location.get("pincode"));
         }
 
-        if (request.getCity() == null) {
-            throw new RuntimeException("City is required");
+        if (request.getCity() == null || request.getCity().trim().isEmpty()) {
+            throw new IllegalArgumentException("City is required");
         }
 
         User user = getCurrentUser();
@@ -155,7 +155,7 @@ public class AddressServiceImpl implements AddressService {
         Long userId = getUserId();
 
         Address address = addressRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> new RuntimeException("Address not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Address not found"));
 
         if (Boolean.TRUE.equals(request.getIsDefault())) {
             clearDefault(userId);
@@ -187,7 +187,7 @@ public class AddressServiceImpl implements AddressService {
         Long userId = getUserId();
 
         Address address = addressRepository.findByIdAndUserId(id, userId)
-                .orElseThrow(() -> new RuntimeException("Address not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Address not found"));
 
         addressRepository.delete(address);
     }
@@ -200,7 +200,7 @@ public class AddressServiceImpl implements AddressService {
         clearDefault(userId);
 
         Address address = addressRepository.findByIdAndUserId(addressId, userId)
-                .orElseThrow(() -> new RuntimeException("Address not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Address not found"));
 
         address.setIsDefault(true);
 
@@ -210,7 +210,7 @@ public class AddressServiceImpl implements AddressService {
     @Override
     public Address getDefaultAddress() {
         return addressRepository.findByUserIdAndIsDefaultTrue(getUserId())
-                .orElseThrow(() -> new RuntimeException("Default address not found"));
+                .orElseThrow(() -> new IllegalArgumentException("Default address not found"));
     }
 
     private void clearDefault(Long userId) {

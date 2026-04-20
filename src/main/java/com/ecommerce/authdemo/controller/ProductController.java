@@ -72,4 +72,28 @@ public class ProductController {
     public List<ProductDTO> bySubCategory(@PathVariable Long id) {
         return productService.getBySubCategory(id);
     }
+
+
+    @GetMapping("/top-selling-price")
+    public List<ProductDTO> getTopSellingPriceProducts() {
+        return productService.getTopSellingPriceProducts();
+    }
+
+    @GetMapping("/category/{categoryId}/top-products")
+    public List<ProductDTO> getTopProductsByCategory(
+            @PathVariable Long categoryId) {
+
+        return productService.getTopProductsByCategory(categoryId);
+    }
+
+
+    @GetMapping("/discount/top")
+    public List<ProductDTO> getTopDiscountProducts() {
+        return productService.getTopDiscountProducts();
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}")
+    public List<ProductDTO> getByMainCategory(@PathVariable Long mainCategoryId) {
+        return productService.getByMainCategory(mainCategoryId);
+    }
 }

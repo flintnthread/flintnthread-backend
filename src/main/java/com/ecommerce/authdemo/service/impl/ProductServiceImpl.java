@@ -11,12 +11,14 @@ import com.ecommerce.authdemo.repository.*;
 import com.ecommerce.authdemo.service.ProductService;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepo;
@@ -26,6 +28,7 @@ public class ProductServiceImpl implements ProductService {
     private final ProductMapper mapper;
 
     @Override
+    @Transactional(readOnly = false)
     public ProductDTO createProduct(ProductDTO dto) {
         Product product = mapper.toEntity(dto);
         return mapper.toDTO(productRepo.save(product));
@@ -103,6 +106,7 @@ public class ProductServiceImpl implements ProductService {
                 .toList();
     }
 
+    @Transactional(readOnly = false)
     public void trackView(ProductViewDTO dto) {
 
         ProductView view = new ProductView();
@@ -134,4 +138,39 @@ public class ProductServiceImpl implements ProductService {
                 .map(mapper::toDTO)
                 .toList();
     }
+
+    @Override
+    public List<ProductDTO> getTopSellingPriceProducts() {
+        return productRepo.findTopSellingProducts()
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getTopProductsByCategory(Long categoryId) {
+        return productRepo.findTopProductsByCategory(categoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+
+    @Override
+    public List<ProductDTO> getTopDiscountProducts() {
+
+        return productRepo.findTopDiscountProducts()
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getByMainCategory(Long mainCategoryId) {
+        return productRepo.findByMainCategoryFull(mainCategoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
 }
