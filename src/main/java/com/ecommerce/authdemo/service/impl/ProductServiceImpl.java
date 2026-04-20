@@ -9,7 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import com.ecommerce.authdemo.repository.*;
 import com.ecommerce.authdemo.service.ProductService;
+import com.ecommerce.authdemo.specification.ProductSpecification;
 
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -171,6 +173,23 @@ public class ProductServiceImpl implements ProductService {
                 .stream()
                 .map(mapper::toDTO)
                 .toList();
+    }
+
+    @Override
+    public Page<ProductDTO> getFilteredProducts(ProductFilterRequestDTO filterRequest) {
+        Specification<Product> spec = ProductSpecification.filterProducts(filterRequest);
+        
+        Pageable pageable = PageRequest.of(
+            filterRequest.getPage(),
+            filterRequest.getSize(),
+            Sort.by(
+                Sort.Direction.fromString(filterRequest.getSortDirection()),
+                filterRequest.getSortBy()
+            )
+        );
+        
+        return productRepo.findAll(spec, pageable)
+                .map(mapper::toDTO);
     }
 
 }

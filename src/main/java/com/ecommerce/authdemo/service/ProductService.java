@@ -1,6 +1,7 @@
 package com.ecommerce.authdemo.service;
 
 import com.ecommerce.authdemo.dto.ProductDTO;
+import com.ecommerce.authdemo.dto.ProductFilterRequestDTO;
 import com.ecommerce.authdemo.dto.ProductViewDTO;
 
 import org.springframework.data.domain.Page;
@@ -44,5 +45,7 @@ public interface ProductService {
     List<ProductDTO> getTopDiscountProducts();
 
     List<ProductDTO> getByMainCategory(Long mainCategoryId);
+
+    Page<ProductDTO> getFilteredProducts(ProductFilterRequestDTO filterRequest);
 
 }
