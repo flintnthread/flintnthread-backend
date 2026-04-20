@@ -2,12 +2,14 @@ package com.ecommerce.authdemo.service.impl;
 
 import com.ecommerce.authdemo.dto.*;
 import com.ecommerce.authdemo.entity.Cart;
+import com.ecommerce.authdemo.entity.Product;
 import com.ecommerce.authdemo.entity.ProductVariant;
 import com.ecommerce.authdemo.entity.User;
 import com.ecommerce.authdemo.exception.ResourceNotFoundException;
 import com.ecommerce.authdemo.exception.CartException;
 import com.ecommerce.authdemo.repository.CartRepository;
 import com.ecommerce.authdemo.repository.ProductImageRepository;
+import com.ecommerce.authdemo.repository.ProductRepository;
 import com.ecommerce.authdemo.repository.ProductVariantRepository;
 import com.ecommerce.authdemo.repository.UserRepository;
 import com.ecommerce.authdemo.service.CartService;
@@ -20,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,6 +34,7 @@ public class CartServiceImpl implements CartService {
     private final CartRepository cartRepository;
     private final SecurityUtil securityUtil;
     private final UserRepository userRepository;
+    private final ProductRepository productRepository;
     private final ProductImageRepository productImageRepository;
     private final ProductVariantRepository productVariantRepository;
     private final SizeColorMapper sizeColorMapper;
@@ -47,7 +51,7 @@ public class CartServiceImpl implements CartService {
         validateAddToCartRequest(dto);
         
         Long userId = securityUtil.getCurrentUserId();
-        BigDecimal productPrice = getProductPrice(dto.getProductId());
+        BigDecimal productPrice = resolveUnitPriceStrict(dto.getProductId(), dto.getVariantId());
         
         // Check if item already exists in cart
         Optional<Cart> existingCart = cartRepository.findByUser_IdAndProductIdAndVariantId(
@@ -58,6 +62,7 @@ public class CartServiceImpl implements CartService {
             int newQuantity = cart.getQuantity() + dto.getQuantity();
             validateQuantity(newQuantity);
             cart.setQuantity(newQuantity);
+            cart.setPrice(productPrice);
             cart.setTotalAmount(productPrice.multiply(BigDecimal.valueOf(newQuantity)));
             cart.setFinalAmount(cart.getTotalAmount().subtract(cart.getDiscountAmount()).add(cart.getShippingAmount()));
             cartRepository.save(cart);
@@ -73,6 +78,7 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    @Transactional
     public CartResponseDTO getCart() {
         Long userId = securityUtil.getCurrentUserId();
         List<Cart> cartItems = cartRepository.findAllByUser_Id(userId);
@@ -94,8 +100,9 @@ public class CartServiceImpl implements CartService {
         
         validateQuantity(newQuantity);
         
-        BigDecimal productPrice = getProductPrice(cart.getProductId());
+        BigDecimal productPrice = resolveUnitPriceStrict(cart.getProductId(), cart.getVariantId());
         cart.setQuantity(newQuantity);
+        cart.setPrice(productPrice);
         cart.setTotalAmount(productPrice.multiply(BigDecimal.valueOf(newQuantity)));
         cart.setFinalAmount(cart.getTotalAmount().subtract(cart.getDiscountAmount()).add(cart.getShippingAmount()));
         cartRepository.save(cart);
@@ -141,6 +148,7 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    @Transactional
     public CartResponseDTO applyCoupon(String code) {
         if (!code.equalsIgnoreCase("SAVE500")) {
             throw new CartException("Invalid coupon code");
@@ -160,30 +168,71 @@ public class CartServiceImpl implements CartService {
     }
 
     private CartResponseDTO buildCartResponse(List<Cart> cartItems) {
-        List<CartItemResponseDTO> itemDTOs = cartItems.stream().map(cart -> {
+        List<CartItemResponseDTO> itemDTOs = new ArrayList<>();
+        List<Cart> cartsToPersist = new ArrayList<>();
+
+        for (Cart cart : cartItems) {
             CartItemResponseDTO dto = new CartItemResponseDTO();
             dto.setItemId(cart.getId());
             dto.setProductId(cart.getProductId());
             dto.setVariantId(cart.getVariantId());
-            dto.setName("Product " + cart.getProductId());
-            dto.setImageUrl(getProductImageUrl(cart.getProductId()));
-            dto.setPrice(cart.getPrice());
-            dto.setOriginalPrice(cart.getPrice().add(BigDecimal.valueOf(300)));
-            dto.setQuantity(cart.getQuantity());
-            dto.setTotal(cart.getTotalAmount());
-            
-            // Fetch variant information to get size and color
-            ProductVariant variant = productVariantRepository.findById(cart.getVariantId()).orElse(null);
-            if (variant != null) {
-                dto.setSize(sizeColorMapper.getSizeName(variant.getSize()));
-                dto.setColor(sizeColorMapper.getColorName(variant.getColor()));
-            }
-            
-            return dto;
-        }).toList();
 
-        BigDecimal subtotal = cartItems.stream()
-                .map(Cart::getTotalAmount)
+            ProductVariant variant = productVariantRepository.findByIdWithProduct(cart.getVariantId()).orElse(null);
+            if (variant != null && variant.getProduct() != null
+                    && !variant.getProduct().getId().equals(cart.getProductId())) {
+                log.warn("Cart line {}: variant {} belongs to product {} but cart has productId {}",
+                        cart.getId(), cart.getVariantId(), variant.getProduct().getId(), cart.getProductId());
+                variant = null;
+            }
+
+            BigDecimal unitSell = resolveSellingForCartLine(variant, cart);
+            BigDecimal rawMrp = variant != null ? variant.resolveMrpUnitPrice() : null;
+            BigDecimal unitMrp = (rawMrp != null && rawMrp.compareTo(unitSell) > 0) ? rawMrp : unitSell;
+
+            if (variant != null && unitSell.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal stored = cart.getPrice() != null ? cart.getPrice() : BigDecimal.ZERO;
+                if (stored.compareTo(unitSell) != 0) {
+                    cart.setPrice(unitSell);
+                    cart.setTotalAmount(unitSell.multiply(BigDecimal.valueOf(cart.getQuantity())));
+                    cart.setFinalAmount(cart.getTotalAmount().subtract(cart.getDiscountAmount()).add(cart.getShippingAmount()));
+                    cartsToPersist.add(cart);
+                }
+            }
+
+            dto.setSellingPrice(unitSell);
+            dto.setMrpPrice(unitMrp);
+            dto.setPrice(unitSell);
+            dto.setOriginalPrice(unitMrp);
+
+            String productTitle = productRepository.findById(cart.getProductId())
+                    .map(Product::getName)
+                    .filter(n -> n != null && !n.isBlank())
+                    .map(String::trim)
+                    .orElse("Product " + cart.getProductId());
+            dto.setName(productTitle);
+            dto.setProductName(productTitle);
+
+            dto.setImageUrl(getProductImageUrl(cart.getProductId()));
+            dto.setQuantity(cart.getQuantity());
+            dto.setTotal(unitSell.multiply(BigDecimal.valueOf(cart.getQuantity())));
+
+            if (variant != null) {
+                String sizeLabel = sizeColorMapper.getSizeName(variant.getSize());
+                String colorLabel = sizeColorMapper.getColorName(variant.getColor());
+                dto.setSize(sizeLabel);
+                dto.setColor(colorLabel);
+                dto.setColorName(colorLabel);
+            }
+
+            itemDTOs.add(dto);
+        }
+
+        if (!cartsToPersist.isEmpty()) {
+            cartRepository.saveAll(cartsToPersist);
+        }
+
+        BigDecimal subtotal = itemDTOs.stream()
+                .map(i -> i.getPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         
         BigDecimal discount = cartItems.stream()
@@ -252,6 +301,9 @@ public class CartServiceImpl implements CartService {
         if (dto.getQuantity() == null || dto.getQuantity() <= 0) {
             throw new CartException("Quantity must be greater than 0");
         }
+        if (dto.getVariantId() == null || dto.getVariantId() <= 0) {
+            throw new CartException("Valid variant ID is required");
+        }
         validateQuantity(dto.getQuantity());
     }
 
@@ -271,10 +323,42 @@ public class CartServiceImpl implements CartService {
         }
     }
 
-    private BigDecimal getProductPrice(Long productId) {
-        // TODO: Integrate with Product Service to get actual price
-        // For now, return a default price based on product ID
+    /**
+     * Unit price when writing cart rows: validated variant + {@link ProductVariant#resolveSellingUnitPrice()},
+     * else legacy stub (only if variant prices are missing in DB).
+     */
+    private BigDecimal resolveUnitPriceStrict(Long productId, Long variantId) {
+        ProductVariant variant = productVariantRepository.findByIdWithProduct(variantId)
+                .orElseThrow(() -> new CartException("Product variant not found"));
+        if (variant.getProduct() == null || !variant.getProduct().getId().equals(productId)) {
+            throw new CartException("Variant does not belong to this product");
+        }
+        BigDecimal fromVariant = variant.resolveSellingUnitPrice();
+        if (fromVariant != null && fromVariant.compareTo(BigDecimal.ZERO) > 0) {
+            return fromVariant;
+        }
+        return getProductPriceFallback(productId);
+    }
+
+    private BigDecimal getProductPriceFallback(Long productId) {
         return BigDecimal.valueOf(500 + (productId % 100) * 10);
+    }
+
+    /**
+     * Selling unit for a cart row: variant {@link ProductVariant#resolveSellingUnitPrice()}, else stored cart price, else stub.
+     */
+    private BigDecimal resolveSellingForCartLine(ProductVariant variant, Cart cart) {
+        if (variant != null) {
+            BigDecimal v = variant.resolveSellingUnitPrice();
+            if (v != null && v.compareTo(BigDecimal.ZERO) > 0) {
+                return v;
+            }
+        }
+        BigDecimal stored = cart.getPrice();
+        if (stored != null && stored.compareTo(BigDecimal.ZERO) > 0) {
+            return stored;
+        }
+        return getProductPriceFallback(cart.getProductId());
     }
 
     private BigDecimal calculateShipping(BigDecimal subtotal) {
