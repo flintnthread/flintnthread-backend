@@ -10,7 +10,7 @@ public class CartItemResponseDTO {
     private Long productId;
 
     private String name;
-    private String image;
+    private String imageUrl;
 
     private String productName;
 

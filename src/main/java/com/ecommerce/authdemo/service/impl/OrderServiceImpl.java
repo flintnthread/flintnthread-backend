@@ -196,7 +196,7 @@ public class OrderServiceImpl implements OrderService {
                     .price(cartItem.getPrice().doubleValue())
                     .total(cartItem.getTotal().doubleValue())
                     .status("processing")
-                    .productImagePath(cartItem.getImage())
+                    .productImagePath(cartItem.getImageUrl())
                     .build();
 
             item = orderItemRepository.save(item);

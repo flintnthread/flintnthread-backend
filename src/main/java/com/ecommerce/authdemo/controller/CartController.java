@@ -63,9 +63,9 @@ public class CartController {
         
         log.info("Update quantity request: itemId={}, quantity={}", id, quantity);
         
-        if (quantity == null || quantity <= 0) {
+        if (quantity == null || quantity == 0) {
             return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Quantity must be greater than 0", null));
+                    .body(new ApiResponse<>(false, "Quantity cannot be zero", null));
         }
         
         try {

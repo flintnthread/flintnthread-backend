@@ -7,10 +7,12 @@ import com.ecommerce.authdemo.exception.ResourceNotFoundException;
 import com.ecommerce.authdemo.exception.CartException;
 import com.ecommerce.authdemo.repository.CartRepository;
 import com.ecommerce.authdemo.repository.UserRepository;
+import com.ecommerce.authdemo.repository.ProductImageRepository;
 import com.ecommerce.authdemo.service.CartService;
 import com.ecommerce.authdemo.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +28,10 @@ public class CartServiceImpl implements CartService {
     private final CartRepository cartRepository;
     private final SecurityUtil securityUtil;
     private final UserRepository userRepository;
+    private final ProductImageRepository productImageRepository;
+    
+    @Value("${app.media.public-base-url}")
+    private String publicBaseUrl;
 
     @Override
     @Transactional
@@ -71,20 +77,26 @@ public class CartServiceImpl implements CartService {
     @Override
     @Transactional
     public CartResponseDTO updateQuantity(Long itemId, Integer quantity) {
-        log.info("Updating cart item quantity: itemId={}, newQuantity={}", itemId, quantity);
-        
-        validateQuantity(quantity);
+        log.info("Updating cart item quantity: itemId={}, quantityToAdd={}", itemId, quantity);
         
         Cart cart = cartRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
         
         validateCartOwnership(cart);
         
+        int currentQuantity = cart.getQuantity();
+        int newQuantity = currentQuantity + quantity;
+        
+        validateQuantity(newQuantity);
+        
         BigDecimal productPrice = getProductPrice(cart.getProductId());
-        cart.setQuantity(quantity);
-        cart.setTotalAmount(productPrice.multiply(BigDecimal.valueOf(quantity)));
+        cart.setQuantity(newQuantity);
+        cart.setTotalAmount(productPrice.multiply(BigDecimal.valueOf(newQuantity)));
         cart.setFinalAmount(cart.getTotalAmount().subtract(cart.getDiscountAmount()).add(cart.getShippingAmount()));
         cartRepository.save(cart);
+        
+        log.info("Updated cart item quantity: itemId={}, previousQuantity={}, addedQuantity={}, newTotalQuantity={}", 
+                itemId, currentQuantity, quantity, newQuantity);
         
         List<Cart> cartItems = cartRepository.findAllByUser_Id(securityUtil.getCurrentUserId());
         return buildCartResponse(cartItems);
@@ -149,7 +161,7 @@ public class CartServiceImpl implements CartService {
             dto.setProductId(cart.getProductId());
             dto.setVariantId(cart.getVariantId());
             dto.setName("Product " + cart.getProductId());
-            dto.setImage("https://via.placeholder.com/150");
+            dto.setImageUrl(getProductImageUrl(cart.getProductId()));
             dto.setPrice(cart.getPrice());
             dto.setOriginalPrice(cart.getPrice().add(BigDecimal.valueOf(300)));
             dto.setQuantity(cart.getQuantity());
@@ -234,8 +246,8 @@ public class CartServiceImpl implements CartService {
         if (quantity == null || quantity <= 0) {
             throw new CartException("Quantity must be greater than 0");
         }
-        if (quantity > 10) {
-            throw new CartException("Maximum quantity allowed is 10");
+        if (quantity > 100) {
+            throw new CartException("Maximum quantity allowed is 100");
         }
     }
 
@@ -258,5 +270,38 @@ public class CartServiceImpl implements CartService {
             return BigDecimal.ZERO;
         }
         return BigDecimal.valueOf(99);
+    }
+
+    private String getProductImageUrl(Long productId) {
+        try {
+            String imagePath = null;
+            
+            // Try to get primary image first
+            var primaryImage = productImageRepository.findTopByProductIdAndIsPrimaryTrue(productId);
+            if (primaryImage != null && primaryImage.getImagePath() != null) {
+                imagePath = primaryImage.getImagePath();
+            } else {
+                // If no primary image, get first image
+                var firstImage = productImageRepository.findFirstByProductId(productId);
+                if (firstImage.isPresent() && firstImage.get().getImagePath() != null) {
+                    imagePath = firstImage.get().getImagePath();
+                }
+            }
+            
+            if (imagePath != null && !imagePath.isEmpty()) {
+                // Construct full URL using base URL
+                if (imagePath.startsWith("http")) {
+                    return imagePath; // Already a full URL
+                } else {
+                    return publicBaseUrl + (imagePath.startsWith("/") ? imagePath : "/" + imagePath);
+                }
+            }
+            
+            // Fallback to placeholder if no images found
+            return "https://via.placeholder.com/150";
+        } catch (Exception e) {
+            log.warn("Error fetching image for product {}: {}", productId, e.getMessage());
+            return "https://via.placeholder.com/150";
+        }
     }
 }
