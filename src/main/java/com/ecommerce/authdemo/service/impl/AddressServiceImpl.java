@@ -2,6 +2,7 @@ package com.ecommerce.authdemo.service.impl;
 
 import com.ecommerce.authdemo.dto.AddressRequest;
 import com.ecommerce.authdemo.entity.Address;
+import com.ecommerce.authdemo.entity.User;
 import com.ecommerce.authdemo.repository.AddressRepository;
 import com.ecommerce.authdemo.service.AddressService;
 import com.ecommerce.authdemo.util.SecurityUtil;
@@ -22,14 +23,18 @@ public class AddressServiceImpl implements AddressService {
     private final AddressRepository addressRepository;
     private final SecurityUtil securityUtil;
 
-    private Integer getUserId() {
-        return securityUtil.getCurrentUser().getId().intValue();
+    private Long getUserId() {
+        return securityUtil.getCurrentUserId();
+    }
+
+    private User getCurrentUser() {
+        return securityUtil.getCurrentUser();
     }
 
     @Override
     public Address addAddress(AddressRequest request) {
 
-        Integer userId = getUserId();
+        Long userId = getUserId();
 
         boolean isFirst = addressRepository.findByUserId(userId).isEmpty();
 
@@ -53,19 +58,13 @@ public class AddressServiceImpl implements AddressService {
             throw new RuntimeException("City is required");
         }
 
+        User user = getCurrentUser();
+
         Address address = Address.builder()
                 .userId(userId)
                 .name(request.getName() != null ? request.getName() : "Current Location")
-                .email(
-                        request.getEmail() != null
-                                ? request.getEmail()
-                                : securityUtil.getCurrentUser().getEmail()
-                )
-                .phone(
-                        request.getPhone() != null
-                                ? request.getPhone()
-                                : securityUtil.getCurrentUser().getContactNumber()
-                )
+                .email(request.getEmail() != null ? request.getEmail() : user.getEmail())
+                .phone(request.getPhone() != null ? request.getPhone() : user.getContactNumber())
                 .addressLine1(request.getAddressLine1())
                 .addressLine2(request.getAddressLine2())
                 .city(request.getCity())
@@ -124,7 +123,7 @@ public class AddressServiceImpl implements AddressService {
             }
 
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("Geolocation error: " + e.getMessage());
         }
 
         result.putIfAbsent("fullAddress", "Current Location");
@@ -153,7 +152,7 @@ public class AddressServiceImpl implements AddressService {
     @Override
     public Address updateAddress(Integer id, AddressRequest request) {
 
-        Integer userId = getUserId();
+        Long userId = getUserId();
 
         Address address = addressRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new RuntimeException("Address not found"));
@@ -185,7 +184,7 @@ public class AddressServiceImpl implements AddressService {
     @Override
     public void deleteAddress(Integer id) {
 
-        Integer userId = getUserId();
+        Long userId = getUserId();
 
         Address address = addressRepository.findByIdAndUserId(id, userId)
                 .orElseThrow(() -> new RuntimeException("Address not found"));
@@ -196,7 +195,7 @@ public class AddressServiceImpl implements AddressService {
     @Override
     public Address setDefaultAddress(Integer addressId) {
 
-        Integer userId = getUserId();
+        Long userId = getUserId();
 
         clearDefault(userId);
 
@@ -214,7 +213,7 @@ public class AddressServiceImpl implements AddressService {
                 .orElseThrow(() -> new RuntimeException("Default address not found"));
     }
 
-    private void clearDefault(Integer userId) {
+    private void clearDefault(Long userId) {
         List<Address> addresses = addressRepository.findByUserId(userId);
         for (Address a : addresses) {
             a.setIsDefault(false);

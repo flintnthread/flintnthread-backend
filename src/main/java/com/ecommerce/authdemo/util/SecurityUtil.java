@@ -4,6 +4,8 @@ import com.ecommerce.authdemo.entity.User;
 import com.ecommerce.authdemo.exception.ResourceNotFoundException;
 import com.ecommerce.authdemo.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
@@ -15,18 +17,26 @@ public class SecurityUtil {
 
     public User getCurrentUser() {
 
-        String principal = SecurityContextHolder
+        Authentication authentication = SecurityContextHolder
                 .getContext()
-                .getAuthentication()
-                .getName();
+                .getAuthentication();
+
+        if (authentication == null ||
+                !authentication.isAuthenticated() ||
+                authentication instanceof AnonymousAuthenticationToken) {
+
+            throw new RuntimeException("User not authenticated");
+        }
+
+        String principal = authentication.getName();
 
         return userRepository.findByEmail(principal)
                 .orElseThrow(() ->
                         new ResourceNotFoundException("User not found with email: " + principal)
                 );
     }
+
     public Long getCurrentUserId() {
         return getCurrentUser().getId();
     }
-
 }

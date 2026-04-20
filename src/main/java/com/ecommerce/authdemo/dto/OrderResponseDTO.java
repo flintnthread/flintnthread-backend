@@ -6,18 +6,27 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-    @Builder
-    public class OrderResponseDTO {
+@Builder
+public class OrderResponseDTO {
 
-        private Long orderId;
-        private String orderNumber;
+    private Long orderId;
+    private String orderNumber;
 
-        private Double totalAmount;
-        private Double finalAmount;
+    private String orderStatus;
+    private String paymentStatus;
+    private String paymentMethod;
 
-        private String paymentStatus;
-        private String orderStatus;
+    private Double totalAmount;
+    private Double finalAmount;
+    private Double shippingAmount;
+    private Double discountAmount;
 
-        private List<OrderItemDTO> items;
-    }
+    private Integer totalItems;
+    private String firstProductImage;
+    private String trackingNumber;
+    private String createdDate;
 
+    private String shippingAddress;
+
+    private List<OrderItemDTO> items;
+}
