@@ -53,4 +53,30 @@ public class ProductVariant {
 
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+
+    /**
+     * Unit selling for cart / UI {@code price}: {@link #sellingPrice}, then {@link #finalPrice}, then {@link #basePrice}.
+     */
+    public BigDecimal resolveSellingUnitPrice() {
+        return firstPositive(sellingPrice, finalPrice, basePrice);
+    }
+
+    /**
+     * Unit MRP for UI {@code originalPrice}: {@link #mrpPrice}, then {@link #mrpInclGst}, then {@link #mrpExclGst}.
+     */
+    public BigDecimal resolveMrpUnitPrice() {
+        return firstPositive(mrpPrice, mrpInclGst, mrpExclGst);
+    }
+
+    private static BigDecimal firstPositive(BigDecimal... candidates) {
+        if (candidates == null) {
+            return null;
+        }
+        for (BigDecimal b : candidates) {
+            if (b != null && b.compareTo(BigDecimal.ZERO) > 0) {
+                return b;
+            }
+        }
+        return null;
+    }
 }

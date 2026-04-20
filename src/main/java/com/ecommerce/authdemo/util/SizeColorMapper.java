@@ -1,12 +1,20 @@
 package com.ecommerce.authdemo.util;
 
+import com.ecommerce.authdemo.repository.ColorRepository;
+import com.ecommerce.authdemo.repository.SizeRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 
 @Component
+@RequiredArgsConstructor
 public class SizeColorMapper {
+
+    private final SizeRepository sizeRepository;
+    private final ColorRepository colorRepository;
 
     // Size ID to Name mappings
     private static final Map<String, String> SIZE_MAP = new HashMap<>();
@@ -60,32 +68,57 @@ public class SizeColorMapper {
         COLOR_MAP.put("60", "White");
     }
 
+    /** Normalize values like {@code "15.0"} to a whole-number id key for lookups. */
+    private static String normalizeNumericIdKey(String trimmed) {
+        try {
+            return String.valueOf(new BigDecimal(trimmed).longValue());
+        } catch (NumberFormatException e) {
+            return trimmed;
+        }
+    }
+
     public String getSizeName(String sizeIdOrName) {
         if (sizeIdOrName == null || sizeIdOrName.trim().isEmpty()) {
             return sizeIdOrName;
         }
-        
-        // If it's already a name (contains letters), return as-is
-        if (sizeIdOrName.matches(".*[a-zA-Z].*")) {
-            return sizeIdOrName;
+        String trimmed = sizeIdOrName.trim();
+
+        if (trimmed.matches(".*[a-zA-Z].*")) {
+            return trimmed;
         }
-        
-        // Try to map ID to name
-        return SIZE_MAP.getOrDefault(sizeIdOrName, sizeIdOrName);
+
+        String idKey = normalizeNumericIdKey(trimmed);
+        try {
+            long id = Long.parseLong(idKey);
+            return sizeRepository.findById(id)
+                    .map(s -> s.getName() != null && !s.getName().isBlank() ? s.getName().trim() : null)
+                    .filter(s -> !s.isEmpty())
+                    .orElse(SIZE_MAP.getOrDefault(idKey, SIZE_MAP.getOrDefault(trimmed, trimmed)));
+        } catch (NumberFormatException ignored) {
+            return SIZE_MAP.getOrDefault(trimmed, trimmed);
+        }
     }
 
     public String getColorName(String colorIdOrName) {
         if (colorIdOrName == null || colorIdOrName.trim().isEmpty()) {
             return colorIdOrName;
         }
-        
-        // If it's already a name (contains letters), return as-is
-        if (colorIdOrName.matches(".*[a-zA-Z].*")) {
-            return colorIdOrName;
+        String trimmed = colorIdOrName.trim();
+
+        if (trimmed.matches(".*[a-zA-Z].*")) {
+            return trimmed;
         }
-        
-        // Try to map ID to name
-        return COLOR_MAP.getOrDefault(colorIdOrName, colorIdOrName);
+
+        String idKey = normalizeNumericIdKey(trimmed);
+        try {
+            long id = Long.parseLong(idKey);
+            return colorRepository.findById(id)
+                    .map(c -> c.getName() != null && !c.getName().isBlank() ? c.getName().trim() : null)
+                    .filter(s -> !s.isEmpty())
+                    .orElse(COLOR_MAP.getOrDefault(idKey, COLOR_MAP.getOrDefault(trimmed, trimmed)));
+        } catch (NumberFormatException ignored) {
+            return COLOR_MAP.getOrDefault(trimmed, trimmed);
+        }
     }
 
     // Add methods to update mappings dynamically if needed
