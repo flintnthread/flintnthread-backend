@@ -133,9 +133,19 @@ public class ProductController {
         return productService.getRecentProducts();
     }
 
+    @GetMapping("/main-category/{mainCategoryId}/recent")
+    public List<ProductDTO> recentByMainCategory(@PathVariable Long mainCategoryId) {
+        return productService.getRecentProductsByMainCategory(mainCategoryId);
+    }
+
     @GetMapping("/popular")
     public List<ProductDTO> popular() {
         return productService.getPopularProducts();
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}/popular")
+    public List<ProductDTO> popularByMainCategory(@PathVariable Long mainCategoryId) {
+        return productService.getPopularProductsByMainCategory(mainCategoryId);
     }
 
     @GetMapping("/trending")
@@ -143,9 +153,19 @@ public class ProductController {
         return productService.getTrendingProducts();
     }
 
+    @GetMapping("/main-category/{mainCategoryId}/trending")
+    public List<ProductDTO> trendingByMainCategory(@PathVariable Long mainCategoryId) {
+        return productService.getTrendingProductsByMainCategory(mainCategoryId);
+    }
+
     @GetMapping("/related/{id}")
     public List<ProductDTO> related(@PathVariable Long id) {
         return productService.getRelatedProducts(id);
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}/related")
+    public List<ProductDTO> relatedByMainCategory(@PathVariable Long mainCategoryId) {
+        return productService.getRelatedProductsByMainCategory(mainCategoryId);
     }
 
     @GetMapping("/search")
@@ -181,6 +201,11 @@ public class ProductController {
     @GetMapping("/discount/top")
     public List<ProductDTO> getTopDiscountProducts() {
         return productService.getTopDiscountProducts();
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}/discount/asc")
+    public List<ProductDTO> getDiscountProductsByMainCategoryAsc(@PathVariable Long mainCategoryId) {
+        return productService.getDiscountProductsByMainCategoryAsc(mainCategoryId);
     }
 
     @GetMapping("/main-category/{mainCategoryId}")
