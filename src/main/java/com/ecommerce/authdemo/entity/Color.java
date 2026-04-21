@@ -4,19 +4,36 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "colors")
 @Getter
 @Setter
-public class Color extends BaseEntity {
+public class Color {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "color_name", nullable = false, length = 100)
     private String name;
+
+    @Column(name = "color_code", nullable = false, length = 20)
     private String code;
+
+    /** Not stored on {@code colors} in this schema; keep for API/constructors only. */
+    @Transient
     private String hex;
+
+    @Column(columnDefinition = "TINYINT(1)")
+    private Integer status;
+
+    @Column(name = "seller_id")
+    private Integer sellerId;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
 
     public Color() {}
 
@@ -24,5 +41,15 @@ public class Color extends BaseEntity {
         this.name = name;
         this.code = code;
         this.hex = hex;
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (status == null) {
+            status = 1;
+        }
     }
 }
