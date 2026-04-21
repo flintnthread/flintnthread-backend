@@ -20,12 +20,16 @@ public interface ProductService {
     Page<ProductDTO> getByCategory(Long categoryId, Pageable pageable);
 
     List<ProductDTO> getRecentProducts();
+    List<ProductDTO> getRecentProductsByMainCategory(Long mainCategoryId);
 
     List<ProductDTO> getPopularProducts();
+    List<ProductDTO> getPopularProductsByMainCategory(Long mainCategoryId);
 
     List<ProductDTO> getTrendingProducts();
+    List<ProductDTO> getTrendingProductsByMainCategory(Long mainCategoryId);
 
     List<ProductDTO> getRelatedProducts(Long productId);
+    List<ProductDTO> getRelatedProductsByMainCategory(Long mainCategoryId);
 
     List<ProductDTO> searchProducts(String keyword);
 
@@ -43,6 +47,7 @@ public interface ProductService {
     List<ProductDTO> getTopProductsByCategory(Long categoryId);
 
     List<ProductDTO> getTopDiscountProducts();
+    List<ProductDTO> getDiscountProductsByMainCategoryAsc(Long mainCategoryId);
 
     List<ProductDTO> getByMainCategory(Long mainCategoryId);
 

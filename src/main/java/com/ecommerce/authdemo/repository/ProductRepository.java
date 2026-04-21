@@ -43,6 +43,32 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     """)
     List<Product> findPopularProducts();
 
+    @Query(value = """
+        SELECT p.*
+        FROM products p
+        WHERE p.category_id = :mainCategoryId
+           OR p.category_id IN (
+               SELECT c.id FROM categories c WHERE c.parent_id = :mainCategoryId
+           )
+        ORDER BY p.created_at DESC
+        LIMIT 10
+    """, nativeQuery = true)
+    List<Product> findRecentProductsByMainCategory(@Param("mainCategoryId") Long mainCategoryId);
+
+    @Query(value = """
+        SELECT p.*
+        FROM products p
+        JOIN product_views v ON v.product_id = p.id
+        WHERE p.category_id = :mainCategoryId
+           OR p.category_id IN (
+               SELECT c.id FROM categories c WHERE c.parent_id = :mainCategoryId
+           )
+        GROUP BY p.id
+        ORDER BY COUNT(v.id) DESC
+        LIMIT 10
+    """, nativeQuery = true)
+    List<Product> findPopularProductsByMainCategory(@Param("mainCategoryId") Long mainCategoryId);
+
     // ---------------- TRENDING ----------------
     @Query("""
         SELECT p FROM Product p
@@ -52,6 +78,35 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
         ORDER BY COUNT(v.id) DESC
     """)
     List<Product> findTrendingProducts(@Param("date") LocalDateTime date);
+
+    @Query(value = """
+        SELECT p.*
+        FROM products p
+        JOIN product_views v ON v.product_id = p.id
+        WHERE v.viewed_at >= :date
+          AND (
+               p.category_id = :mainCategoryId
+               OR p.category_id IN (
+                   SELECT c.id FROM categories c WHERE c.parent_id = :mainCategoryId
+               )
+          )
+        GROUP BY p.id
+        ORDER BY COUNT(v.id) DESC
+        LIMIT 10
+    """, nativeQuery = true)
+    List<Product> findTrendingProductsByMainCategory(@Param("date") LocalDateTime date, @Param("mainCategoryId") Long mainCategoryId);
+
+    @Query(value = """
+        SELECT p.*
+        FROM products p
+        WHERE p.category_id = :mainCategoryId
+           OR p.category_id IN (
+               SELECT c.id FROM categories c WHERE c.parent_id = :mainCategoryId
+           )
+        ORDER BY p.created_at DESC
+        LIMIT 10
+    """, nativeQuery = true)
+    List<Product> findRelatedProductsByMainCategory(@Param("mainCategoryId") Long mainCategoryId);
 
     // ---------------- FULL FETCH ----------------
     @Query("""
@@ -103,6 +158,19 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     LIMIT 10
 """, nativeQuery = true)
     List<Product> findTopDiscountProducts();
+
+    @Query(value = """
+        SELECT p.*
+        FROM products p
+        JOIN product_variants v ON p.id = v.product_id
+        WHERE p.category_id = :mainCategoryId
+           OR p.category_id IN (
+               SELECT c.id FROM categories c WHERE c.parent_id = :mainCategoryId
+           )
+        GROUP BY p.id
+        ORDER BY MIN(v.discount_percentage) ASC
+    """, nativeQuery = true)
+    List<Product> findDiscountProductsByMainCategoryAsc(@Param("mainCategoryId") Long mainCategoryId);
 
     // ---------------- PRODUCTS BY MAIN CATEGORY (INCLUDING SUBCATEGORIES) ----------------
     @Query(value = """

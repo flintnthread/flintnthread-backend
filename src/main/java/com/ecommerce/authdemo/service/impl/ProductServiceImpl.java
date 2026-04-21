@@ -67,8 +67,24 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public List<ProductDTO> getRecentProductsByMainCategory(Long mainCategoryId) {
+        return productRepo.findRecentProductsByMainCategory(mainCategoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
     public List<ProductDTO> getPopularProducts() {
         return productRepo.findPopularProducts()
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getPopularProductsByMainCategory(Long mainCategoryId) {
+        return productRepo.findPopularProductsByMainCategory(mainCategoryId)
                 .stream()
                 .map(mapper::toDTO)
                 .toList();
@@ -86,12 +102,30 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public List<ProductDTO> getTrendingProductsByMainCategory(Long mainCategoryId) {
+        LocalDateTime last7Days = LocalDateTime.now().minusDays(7);
+
+        return productRepo.findTrendingProductsByMainCategory(last7Days, mainCategoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
     public List<ProductDTO> getRelatedProducts(Long productId) {
         Product product = productRepo.findById(productId).orElseThrow();
 
         return productRepo.findTop10ByCategoryIdAndIdNot(
                 Long.valueOf(product.getCategoryId()), productId
         ).stream().map(mapper::toDTO).toList();
+    }
+
+    @Override
+    public List<ProductDTO> getRelatedProductsByMainCategory(Long mainCategoryId) {
+        return productRepo.findRelatedProductsByMainCategory(mainCategoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
     }
 
     @Override
@@ -164,6 +198,14 @@ public class ProductServiceImpl implements ProductService {
     public List<ProductDTO> getTopDiscountProducts() {
 
         return productRepo.findTopDiscountProducts()
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getDiscountProductsByMainCategoryAsc(Long mainCategoryId) {
+        return productRepo.findDiscountProductsByMainCategoryAsc(mainCategoryId)
                 .stream()
                 .map(mapper::toDTO)
                 .toList();
