@@ -91,6 +91,12 @@ public class SecurityConfig {
                         .permitAll()
 
                         // --------------------------------
+                        // PUBLIC BANNER APIs
+                        // --------------------------------
+                        .requestMatchers("/api/banners/**")
+                        .permitAll()
+
+                        // --------------------------------
                         // PAYMENT (Razorpay) — Postman / checkout without JWT
                         // --------------------------------
                         .requestMatchers("/api/payment/**")
