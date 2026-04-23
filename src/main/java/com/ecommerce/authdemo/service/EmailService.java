@@ -6,6 +6,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+import com.ecommerce.authdemo.entity.EmailLogStatus;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
@@ -14,6 +15,9 @@ public class EmailService {
 
     @Autowired
     private JavaMailSender mailSender;
+
+    @Autowired
+    private EmailLogService emailLogService;
 
     public void sendOtpEmail(String toEmail, String otp) {
         SimpleMailMessage message = new SimpleMailMessage();
@@ -31,8 +35,24 @@ public class EmailService {
 
         try {
             mailSender.send(message);
+            emailLogService.createLog(
+                    null,
+                    "otp",
+                    toEmail,
+                    message.getSubject(),
+                    EmailLogStatus.sent,
+                    null
+            );
             log.info("OTP Email sent to: {}", toEmail);
         } catch (MailException e) {
+            emailLogService.createLog(
+                    null,
+                    "otp",
+                    toEmail,
+                    message.getSubject(),
+                    EmailLogStatus.failed,
+                    e.getMessage()
+            );
             log.error("Failed to send OTP email to: {}", toEmail, e);
             throw new RuntimeException("Unable to send OTP email");
         }

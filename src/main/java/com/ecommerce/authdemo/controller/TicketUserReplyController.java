@@ -1,0 +1,35 @@
+package com.ecommerce.authdemo.controller;
+
+import com.ecommerce.authdemo.dto.ApiResponse;
+import com.ecommerce.authdemo.dto.TicketUserReplyRequest;
+import com.ecommerce.authdemo.dto.TicketUserReplyResponse;
+import com.ecommerce.authdemo.service.TicketUserReplyService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/support-tickets/{ticketId}/user-replies")
+@RequiredArgsConstructor
+public class TicketUserReplyController {
+
+    private final TicketUserReplyService ticketUserReplyService;
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<TicketUserReplyResponse>> create(
+            @PathVariable Integer ticketId,
+            @Valid @RequestBody TicketUserReplyRequest request) {
+        TicketUserReplyResponse data = ticketUserReplyService.create(ticketId, request);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Ticket user reply created successfully", data));
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<TicketUserReplyResponse>>> getByTicketId(
+            @PathVariable Integer ticketId) {
+        List<TicketUserReplyResponse> data = ticketUserReplyService.getByTicketId(ticketId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Ticket user replies fetched successfully", data));
+    }
+}

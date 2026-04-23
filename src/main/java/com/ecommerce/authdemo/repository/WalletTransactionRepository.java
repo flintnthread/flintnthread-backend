@@ -14,5 +14,7 @@ import java.util.List;
         List<WalletTransaction> findBySellerId(Integer sellerId);
 
         List<WalletTransaction> findByOrderId(Integer orderId);
+
+        List<WalletTransaction> findBySellerIdAndOrderId(Integer sellerId, Integer orderId);
     }
 

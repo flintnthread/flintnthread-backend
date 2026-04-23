@@ -1,0 +1,8 @@
+{
+  "name": "flintnthread-backend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "expo": "^55.0.17"
+  }
+}

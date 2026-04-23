@@ -4,8 +4,10 @@ package com.ecommerce.authdemo.service.impl;
 
 import com.ecommerce.authdemo.entity.UserWallet;
 import com.ecommerce.authdemo.entity.WalletTransaction;
+import com.ecommerce.authdemo.dto.WalletResponse;
 import com.ecommerce.authdemo.repository.UserWalletRepository;
 import com.ecommerce.authdemo.repository.WalletTransactionRepository;
+import com.ecommerce.authdemo.exception.ResourceNotFoundException;
 import com.ecommerce.authdemo.service.WalletService;
 
 import lombok.RequiredArgsConstructor;
@@ -32,6 +34,13 @@ import java.math.BigDecimal;
                     .build();
 
             walletRepo.save(wallet);
+        }
+
+        @Override
+        public WalletResponse getWallet(Integer userId) {
+            UserWallet wallet = walletRepo.findByUserId(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Wallet not found"));
+            return toResponse(wallet);
         }
 
         // ✅ Add money (referral / cashback)
@@ -84,6 +93,18 @@ import java.math.BigDecimal;
                     .build();
 
             walletTransactionRepo.save(txn);
+        }
+
+        private WalletResponse toResponse(UserWallet wallet) {
+            return WalletResponse.builder()
+                    .id(wallet.getId())
+                    .userId(wallet.getUserId())
+                    .balance(wallet.getBalance())
+                    .totalEarned(wallet.getTotalEarned())
+                    .totalSpent(wallet.getTotalSpent())
+                    .createdAt(wallet.getCreatedAt())
+                    .updatedAt(wallet.getUpdatedAt())
+                    .build();
         }
     }
 
