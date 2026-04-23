@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Razorpay Payment</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+    <h1>Test Razorpay Payment</h1>
+    <button onclick="testPayment()">Pay Rs. 100</button>
+    
+    <script>
+        function testPayment() {
+            // First, create an order
+            fetch('http://localhost:8080/api/payment/create-order', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ amount: 100 })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const order = data.data;
+                    
+                    var options = {
+                        "key": data.razorpayKeyId,
+                        "amount": order.amount,
+                        "currency": order.currency,
+                        "name": "Test Payment",
+                        "description": "Test Transaction",
+                        "order_id": order.id,
+                        "handler": function (response) {
+                            console.log("Payment successful!");
+                            console.log("Order ID:", response.razorpay_order_id);
+                            console.log("Payment ID:", response.razorpay_payment_id);
+                            console.log("Signature:", response.razorpay_signature);
+                            
+                            // Now test verification
+                            testVerification(response.razorpay_order_id, response.razorpay_payment_id, response.razorpay_signature);
+                        },
+                        "modal": {
+                            "ondismiss": function(){
+                                console.log("Payment cancelled");
+                            }
+                        }
+                    };
+                    
+                    var rzp = new Razorpay(options);
+                    rzp.open();
+                }
+            })
+            .catch(error => console.error('Error:', error));
+        }
+        
+        function testVerification(orderId, paymentId, signature) {
+            const url = `http://localhost:8080/api/payment/verify?orderId=${orderId}&paymentId=${paymentId}&signature=${signature}`;
+            
+            fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log("Verification result:", data);
+                alert("Verification: " + data.message);
+            })
+            .catch(error => console.error('Verification error:', error));
+        }
+    </script>
+</body>
+</html>

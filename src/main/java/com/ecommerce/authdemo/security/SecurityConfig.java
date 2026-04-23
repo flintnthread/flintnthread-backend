@@ -10,6 +10,7 @@ import org.springframework.security.config.annotation.authentication.configurati
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 
+import org.springframework.http.HttpMethod;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -36,6 +37,7 @@ public class SecurityConfig {
                 )
 
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
                         // --------------------------------
                         // PUBLIC AUTH APIs
@@ -54,7 +56,13 @@ public class SecurityConfig {
                         // --------------------------------
                         // PUBLIC LOCATION APIs
                         // --------------------------------
-                        .requestMatchers("/api/location/**")
+                        .requestMatchers("/api/location/update")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/location/countries")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/location/states")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/location/pincodes")
                         .permitAll()
 
                                 // --------------------------------
@@ -101,6 +109,97 @@ public class SecurityConfig {
                         // --------------------------------
                         .requestMatchers("/api/payment/**")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/delivery-charges")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/delivery-charges/by-weight")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/delivery-options")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/exchange-images")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/return-images")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/faq-categories")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/faqs")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/invoices")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/invoices/by-number/**")
+                        .permitAll()
+
+                        // --------------------------------
+                        // SHIPROCKET WEBHOOK (PUBLIC CALLBACK)
+                        // --------------------------------
+                        .requestMatchers(HttpMethod.POST, "/api/shiprocket/webhook", "/api/shiprocket/webhook/**")
+                        .permitAll()
+
+                        // --------------------------------
+                        // CONTACT US (PUBLIC SUBMIT)
+                        // --------------------------------
+                        .requestMatchers("/api/contact/submit")
+                        .permitAll()
+
+                        // --------------------------------
+                        // COOKIES POLICY (PUBLIC READ)
+                        // --------------------------------
+                        .requestMatchers("/api/cookies-policy")
+                        .permitAll()
+                        .requestMatchers("/api/terms-conditions")
+                        .permitAll()
+
+                        // --------------------------------
+                        // SHIPROCKET SYNC LOGS (ADMIN ONLY)
+                        // --------------------------------
+                        .requestMatchers("/api/shiprocket/sync-logs/**")
+                        .hasRole("ADMIN")
+
+                        // --------------------------------
+                        // CONTACT MESSAGES (ADMIN ONLY)
+                        // --------------------------------
+                        .requestMatchers("/api/contact/messages/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/delivery-charges/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/delivery-options/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/email-logs/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/exchange-images/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/return-images/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/faq-categories/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/faqs/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/invoices/**")
+                        .hasRole("ADMIN")
+
+                        // --------------------------------
+                        // COOKIES POLICY (ADMIN UPDATE)
+                        // --------------------------------
+                        .requestMatchers("/api/cookies-policy/admin/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers("/api/terms-conditions/admin/**")
+                        .hasRole("ADMIN")
+
+                        // --------------------------------
+                        // ADMIN LOCATION CITY MANAGEMENT
+                        // --------------------------------
+                        .requestMatchers(
+                                "/api/location/cities",
+                                "/api/location/cities/**"
+                        ).hasRole("ADMIN")
+                        .requestMatchers(
+                                "/api/location/countries/**"
+                        ).hasRole("ADMIN")
+                        .requestMatchers(
+                                "/api/location/states/**"
+                        ).hasRole("ADMIN")
+                        .requestMatchers(
+                                "/api/location/pincodes/**"
+                        ).hasRole("ADMIN")
 
                         // --------------------------------
                         // ADMIN CATEGORY MANAGEMENT
