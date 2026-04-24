@@ -166,7 +166,6 @@ public class OrderServiceImpl implements OrderService {
                 .shippingAmount(shippingAmount.doubleValue())
                 .discountAmount(discountAmount.doubleValue())
                 .taxAmount(0.0)
-                .finalAmount(finalAmount.doubleValue())
                 .paymentMethod(dto.getPaymentMethod())
                 .paymentStatus("pending")
                 .orderStatus("processing")
@@ -224,7 +223,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderId(order.getId())
                 .orderNumber(order.getOrderNumber())
                 .totalAmount(order.getTotalAmount())
-                .finalAmount(order.getFinalAmount())
+                .finalAmount(order.getTotalAmount())
                 .orderStatus(order.getOrderStatus())
                 .paymentStatus(order.getPaymentStatus())
                 .items(itemDTOList)
@@ -244,8 +243,8 @@ public class OrderServiceImpl implements OrderService {
                 .orderNumber(order.getOrderNumber())
                 .orderStatus(order.getOrderStatus())
                 .paymentStatus(order.getPaymentStatus())
-                .finalAmount(order.getFinalAmount())
-                .totalItems(items.size())
+                .totalAmount(order.getTotalAmount())
+                .finalAmount(order.getTotalAmount())
                 .firstProductImage(items.isEmpty() ? null : items.get(0).getProductImagePath())
                 .createdDate(formatDateTime(order.getCreatedAt()))
                 .build();
@@ -258,7 +257,7 @@ public class OrderServiceImpl implements OrderService {
                 .orderStatus(order.getOrderStatus())
                 .paymentStatus(order.getPaymentStatus())
                 .totalAmount(order.getTotalAmount())
-                .finalAmount(order.getFinalAmount())
+                .finalAmount(order.getTotalAmount())
                 .shippingAmount(order.getShippingAmount())
                 .discountAmount(order.getDiscountAmount())
                 .paymentMethod(order.getPaymentMethod())
@@ -280,4 +279,93 @@ public class OrderServiceImpl implements OrderService {
         if (dateTime == null) return "";
         return dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
+
+    @Override
+    @Transactional
+    public Order markOrderAsPaid(String razorpayOrderId, String paymentId) {
+
+        Order order = orderRepository.findByRazorpayOrderId(razorpayOrderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        order.setPaymentStatus("paid");
+        order.setOrderStatus("processing");
+        order.setRazorpayPaymentId(paymentId);
+
+        return orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
+    public void updateShipment(String orderNumber, String awb, String courier, String trackingUrl) {
+
+        Order order = orderRepository.findByOrderNumber(orderNumber)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+
+        order.setShiprocketAwbCode(awb);
+        order.setShiprocketCourierName(courier);
+        order.setShiprocketTrackingUrl(trackingUrl);
+        order.setShiprocketStatus("shipped");
+        order.setOrderStatus("processing");
+
+        orderRepository.save(order);
+    }
+
+    @Override
+    @Transactional
+    public void updateOrderStatusFromWebhook(String awb, String status) {
+        log.info("Updating order status from webhook: AWB={}, Status={}", awb, status);
+        
+        try {
+            Order order = orderRepository.findByShiprocketAwbCode(awb)
+                    .orElseThrow(() -> new RuntimeException("Order not found for AWB: " + awb));
+
+            // Map Shiprocket status to our order status
+            String mappedStatus = mapShiprocketStatus(status);
+            order.setOrderStatus(mappedStatus);
+            
+            orderRepository.save(order);
+            
+            log.info("Order status updated: OrderNumber={}, NewStatus={}", order.getOrderNumber(), mappedStatus);
+        } catch (Exception e) {
+            log.warn("Failed to update order status from webhook AWB={}: {}", awb, e.getMessage());
+            // Don't throw exception - webhook processing should continue
+        }
+    }
+
+    @Override
+    @Transactional
+    public void linkRazorpayOrder(String razorpayOrderId) {
+        log.info("Linking Razorpay order ID: {}", razorpayOrderId);
+        
+        // get latest pending order
+        Order order = orderRepository
+                .findTopByPaymentStatusOrderByCreatedAtDesc("pending")
+                .orElseThrow(() -> new RuntimeException("No pending order found"));
+
+        order.setRazorpayOrderId(razorpayOrderId);
+        orderRepository.save(order);
+        
+        log.info("Razorpay order linked: OrderNumber={}, RazorpayOrderId={}", 
+            order.getOrderNumber(), razorpayOrderId);
+    }
+
+    private String mapShiprocketStatus(String shiprocketStatus) {
+        if (shiprocketStatus == null) return "processing";
+        
+        switch (shiprocketStatus.toUpperCase()) {
+            case "PICKED_UP":
+            case "IN_TRANSIT":
+                return "processing";
+            case "OUT_FOR_DELIVERY":
+                return "processing";
+            case "DELIVERED":
+                return "completed";
+            case "CANCELLED":
+            case "RTO":
+                return "cancelled";
+            default:
+                return "processing";
+        }
+    }
+
 }

@@ -2,6 +2,7 @@ package com.ecommerce.authdemo.service;
 
 import com.ecommerce.authdemo.dto.OrderResponseDTO;
 import com.ecommerce.authdemo.dto.PlaceOrderRequestDTO;
+import com.ecommerce.authdemo.entity.Order;
 
 import java.util.List;
 
@@ -14,4 +15,12 @@ public interface OrderService {
     OrderResponseDTO getOrderDetails(Long orderId);
 
     void cancelOrder(Long orderId);
+
+    Order markOrderAsPaid(String razorpayOrderId, String paymentId);
+
+    void updateShipment(String orderNumber, String awb, String courier, String trackingUrl);
+
+    void updateOrderStatusFromWebhook(String awb, String status);
+
+    void linkRazorpayOrder(String razorpayOrderId);
 }

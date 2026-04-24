@@ -208,15 +208,34 @@ public class ShiprocketWebhookServiceImpl implements ShiprocketWebhookService {
             return null;
         }
         String normalized = normalize(sourceStatus);
-        return switch (normalized) {
-            case "delivered" -> "delivered";
-            case "out_for_delivery" -> "out_for_delivery";
-            case "in_transit", "shipped", "awb_assigned", "pickup_scheduled", "picked_up" -> "shipped";
-            case "cancelled", "canceled", "undelivered", "rto_initiated", "rto_delivered" -> "cancelled";
-            case "return_initiated", "returned" -> "returned";
-            case "processing", "new", "confirmed", "packed" -> "processing";
-            default -> null;
-        };
+        switch (normalized) {
+            case "delivered":
+                return "completed"; // ✅ Valid ENUM
+            case "out_for_delivery":
+                return "processing"; // ✅ Valid ENUM
+            case "in_transit":
+            case "shipped":
+            case "awb_assigned":
+            case "pickup_scheduled":
+            case "picked_up":
+                return "processing"; // ✅ Valid ENUM
+            case "cancelled":
+            case "canceled":
+            case "undelivered":
+            case "rto_initiated":
+            case "rto_delivered":
+                return "cancelled"; // ✅ Valid ENUM
+            case "return_initiated":
+            case "returned":
+                return "returned"; // ✅ Valid ENUM
+            case "processing":
+            case "new":
+            case "confirmed":
+            case "packed":
+                return "processing"; // ✅ Valid ENUM
+            default:
+                return null;
+        }
     }
 
     private OrderStatus mapToOrderStatusEnum(String orderTableStatus) {
