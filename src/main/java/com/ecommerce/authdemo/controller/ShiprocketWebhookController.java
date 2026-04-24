@@ -1,16 +1,13 @@
 package com.ecommerce.authdemo.controller;
 
-import com.ecommerce.authdemo.dto.ApiResponse;
-import com.ecommerce.authdemo.dto.ShiprocketSyncLogDTO;
-import com.ecommerce.authdemo.service.ShiprocketSyncLogService;
-import com.ecommerce.authdemo.service.ShiprocketWebhookService;
+import com.ecommerce.authdemo.service.OrderService;
+import com.ecommerce.authdemo.service.ShiprocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -20,50 +17,57 @@ import java.util.Map;
 @Slf4j
 public class ShiprocketWebhookController {
 
-    private final ShiprocketWebhookService shiprocketWebhookService;
-    private final ShiprocketSyncLogService shiprocketSyncLogService;
+    private final ShiprocketService shiprocketService;
+    private final OrderService orderService;
 
     @PostMapping("/webhook")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> receiveWebhook(
+    public ResponseEntity<Map<String, Object>> receiveWebhook(
             @RequestBody(required = false) Map<String, Object> payload) {
         try {
-            shiprocketWebhookService.handleWebhook(payload);
-            return ResponseEntity.ok(new ApiResponse<>(
-                    true,
-                    "Webhook received",
-                    Map.of("processed", true)
+            log.info("Received Shiprocket webhook: {}", payload);
+            
+            if (payload == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Empty webhook payload"
+                ));
+            }
+
+            // Process webhook data
+            shiprocketService.handleWebhook(payload);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Webhook processed successfully",
+                "processed", true
             ));
+            
         } catch (Exception e) {
             log.error("Failed to process Shiprocket webhook", e);
-            return ResponseEntity.internalServerError().body(new ApiResponse<>(
-                    false,
-                    "Failed to process webhook",
-                    Map.of("processed", false)
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "message", "Failed to process webhook",
+                "processed", false
             ));
         }
     }
 
-    @GetMapping("/sync-logs")
-    public ResponseEntity<ApiResponse<List<ShiprocketSyncLogDTO>>> getSyncLogs(
-            @RequestParam(required = false) Integer orderId,
-            @RequestParam(required = false) String orderNumber,
-            @RequestParam(required = false) LocalDate fromDate,
-            @RequestParam(required = false) LocalDate toDate) {
+    @GetMapping("/track/{awb}")
+    public ResponseEntity<Map<String, Object>> trackShipment(@PathVariable String awb) {
         try {
-            List<ShiprocketSyncLogDTO> logs = shiprocketSyncLogService.getSyncLogs(
-                    orderId, orderNumber, fromDate, toDate
-            );
-            return ResponseEntity.ok(new ApiResponse<>(
-                    true,
-                    "Sync logs fetched successfully",
-                    logs
+            String trackingInfo = shiprocketService.trackShipment(awb);
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "Tracking information retrieved",
+                "data", trackingInfo
             ));
+            
         } catch (Exception e) {
-            log.error("Failed to fetch Shiprocket sync logs", e);
-            return ResponseEntity.internalServerError().body(new ApiResponse<>(
-                    false,
-                    "Failed to fetch sync logs",
-                    List.of()
+            log.error("Failed to track shipment AWB: {}", awb, e);
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "message", "Failed to track shipment"
             ));
         }
     }

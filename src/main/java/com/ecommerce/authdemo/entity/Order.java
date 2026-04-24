@@ -27,9 +27,6 @@ public class Order {
     @Column(name = "total_amount")
     private Double totalAmount;
 
-    @Column(name = "final_amount")
-    private Double finalAmount;
-
     @Column(name = "shipping_amount")
     private Double shippingAmount;
 
@@ -98,4 +95,26 @@ public class Order {
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();
     }
+
+
+    @Column(name = "razorpay_order_id")
+    private String razorpayOrderId;
+
+    @Column(name = "razorpay_payment_id")
+    private String razorpayPaymentId;
+
+    @Column(name = "razorpay_signature")
+    private String razorpaySignature;
+
+    @Column(name = "shiprocket_awb_code")
+    private String shiprocketAwbCode;
+
+    @Column(name = "shiprocket_courier_name")
+    private String shiprocketCourierName;
+
+    @Column(name = "shiprocket_tracking_url")
+    private String shiprocketTrackingUrl;
+
+    @Column(name = "shiprocket_status")
+    private String shiprocketStatus;
 }

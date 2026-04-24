@@ -1,13 +1,17 @@
-
 package com.ecommerce.authdemo.controller;
 
+import com.ecommerce.authdemo.service.OrderService;
 import com.ecommerce.authdemo.service.RazorpayService;
+import com.ecommerce.authdemo.service.ShiprocketService;
+import com.ecommerce.authdemo.entity.Order;
 import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,7 +22,11 @@ import java.util.Map;
 @CrossOrigin("*")
 public class PaymentController {
 
+    private static final Logger logger = LoggerFactory.getLogger(PaymentController.class);
+
     private final RazorpayService razorpayService;
+    private final OrderService orderService;
+    private final ShiprocketService shiprocketService;
 
     @Value("${razorpay.key_id:}")
     private String razorpayKeyId;
@@ -71,7 +79,7 @@ public class PaymentController {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body);
     }
 
-    // ✅ 1. CREATE ORDER — amount: query ?amount=100 and/or JSON body {"amount":100}
+    // 1. CREATE ORDER — amount: query ?amount=100 and/or JSON body {"amount":100}
     @PostMapping("/create-order")
     public ResponseEntity<?> createOrder(
             @RequestParam(required = false) Double amount,
@@ -88,6 +96,10 @@ public class PaymentController {
 
         try {
             JSONObject order = razorpayService.createOrder(resolved);
+
+            // 🔥 IMPORTANT: Link Razorpay order ID with DB order
+            String razorpayOrderId = order.get("id").toString();
+            orderService.linkRazorpayOrder(razorpayOrderId);
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -107,7 +119,7 @@ public class PaymentController {
         }
     }
 
-    // ✅ 2. VERIFY PAYMENT
+    // 2. VERIFY PAYMENT
     @PostMapping("/verify")
     public ResponseEntity<?> verifyPayment(
             @RequestParam String orderId,
@@ -120,6 +132,26 @@ public class PaymentController {
             Map<String, Object> response = new HashMap<>();
             response.put("success", success);
             response.put("message", success ? "Payment successful" : "Payment failed");
+
+            // AFTER PAYMENT SUCCESS: Update order → Call shipping → Save tracking
+            if (success) {
+                try {
+                    // Update order as paid
+                    Order paidOrder = orderService.markOrderAsPaid(orderId, paymentId);
+
+                    // Create shipment with Shiprocket
+                    shiprocketService.createShipment(paidOrder);
+
+                    response.put("shipping_initiated", true);
+                    response.put("order_number", paidOrder.getOrderNumber());
+
+                } catch (Exception shippingError) {
+                    // Log shipping error but don't fail the payment verification
+                    logger.error("Payment successful but shipping failed: {}", shippingError.getMessage());
+                    response.put("shipping_initiated", false);
+                    response.put("shipping_error", "Shipping will be processed later");
+                }
+            }
 
             return ResponseEntity.ok(response);
 
