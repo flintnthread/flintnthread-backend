@@ -7,12 +7,30 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 
 public interface DeliveryChargesRepository extends JpaRepository<DeliveryCharges, Integer> {
 
-    Optional<DeliveryCharges> findByWeightMinLessThanEqualAndWeightMaxGreaterThanEqual(
-            BigDecimal weight, BigDecimal weight2);
+    @Query("""
+            SELECT d
+            FROM DeliveryCharges d
+            WHERE d.status = true
+              AND d.weightMin <= :weight
+              AND d.weightMax >= :weight
+            ORDER BY d.weightMin DESC, d.weightMax ASC, d.id ASC
+            """)
+    List<DeliveryCharges> findActiveByWeight(@Param("weight") BigDecimal weight);
+
+    @Query("""
+            SELECT d
+            FROM DeliveryCharges d
+            WHERE d.id <> :excludeId
+              AND d.weightMin <= :weightMax
+              AND d.weightMax >= :weightMin
+            """)
+    List<DeliveryCharges> findOverlappingSlabs(
+            @Param("weightMin") BigDecimal weightMin,
+            @Param("weightMax") BigDecimal weightMax,
+            @Param("excludeId") Integer excludeId);
 
     @Query("""
             SELECT d

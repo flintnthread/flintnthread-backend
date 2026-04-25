@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -21,7 +22,7 @@ public class DeliveryChargesServiceImpl implements DeliveryChargesService {
 
     @Override
     public DeliveryChargeResponse create(DeliveryChargeRequest request) {
-        validate(request);
+        validate(request, null);
         DeliveryCharges entity = DeliveryCharges.builder()
                 .weightSlab(request.getWeightSlab().trim())
                 .weightMin(request.getWeightMin())
@@ -45,7 +46,7 @@ public class DeliveryChargesServiceImpl implements DeliveryChargesService {
 
     @Override
     public DeliveryChargeResponse update(Integer id, DeliveryChargeRequest request) {
-        validate(request);
+        validate(request, id);
         DeliveryCharges entity = deliveryChargesRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery charge slab not found"));
 
@@ -73,16 +74,38 @@ public class DeliveryChargesServiceImpl implements DeliveryChargesService {
         if (weight == null || weight.compareTo(BigDecimal.ZERO) < 0) {
             throw new OrderException("Valid weight is required");
         }
-        DeliveryCharges entity = deliveryChargesRepository
-                .findByWeightMinLessThanEqualAndWeightMaxGreaterThanEqual(weight, weight)
-                .filter(DeliveryCharges::getStatus)
-                .orElseThrow(() -> new ResourceNotFoundException("No delivery slab found for weight " + weight));
+        List<DeliveryCharges> matchingSlabs = deliveryChargesRepository.findActiveByWeight(weight);
+        if (matchingSlabs.isEmpty()) {
+            throw new ResourceNotFoundException("No delivery slab found for weight " + weight);
+        }
+        if (matchingSlabs.size() > 1) {
+            String slabIds = matchingSlabs.stream()
+                    .map(DeliveryCharges::getId)
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(", "));
+            throw new OrderException("Multiple active delivery slabs found for weight "
+                    + weight + ". Overlapping slab IDs: " + slabIds);
+        }
+        DeliveryCharges entity = matchingSlabs.get(0);
         return toResponse(entity);
     }
 
-    private void validate(DeliveryChargeRequest request) {
+    private void validate(DeliveryChargeRequest request, Integer existingId) {
         if (request.getWeightMin().compareTo(request.getWeightMax()) > 0) {
             throw new OrderException("weightMin cannot be greater than weightMax");
+        }
+        Integer excludeId = existingId != null ? existingId : -1;
+        List<DeliveryCharges> overlaps = deliveryChargesRepository.findOverlappingSlabs(
+                request.getWeightMin(),
+                request.getWeightMax(),
+                excludeId
+        );
+        if (!overlaps.isEmpty()) {
+            String overlapIds = overlaps.stream()
+                    .map(DeliveryCharges::getId)
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(", "));
+            throw new OrderException("Weight range overlaps with existing slab(s): " + overlapIds);
         }
     }
 

@@ -5,8 +5,10 @@ import com.ecommerce.authdemo.entity.*;
 import com.ecommerce.authdemo.exception.ResourceNotFoundException;
 import com.ecommerce.authdemo.exception.OrderException;
 import com.ecommerce.authdemo.repository.AddressRepository;
+import com.ecommerce.authdemo.repository.CartRepository;
 import com.ecommerce.authdemo.repository.OrderItemRepository;
 import com.ecommerce.authdemo.repository.OrderRepository;
+import com.ecommerce.authdemo.repository.ProductRepository;
 import com.ecommerce.authdemo.service.CartService;
 import com.ecommerce.authdemo.service.OrderService;
 import com.ecommerce.authdemo.util.SecurityUtil;
@@ -20,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -29,42 +32,51 @@ public class OrderServiceImpl implements OrderService {
     private final OrderRepository orderRepository;
     private final OrderItemRepository orderItemRepository;
     private final CartService cartService;
+    private final CartRepository cartRepository;
     private final AddressRepository addressRepository;
+    private final ProductRepository productRepository;
     private final SecurityUtil securityUtil;
 
     @Override
     @Transactional
     public OrderResponseDTO placeOrder(PlaceOrderRequestDTO dto) {
         log.info("Placing order: paymentMethod={}, addressId={}", dto.getPaymentMethod(), dto.getAddressId());
-        
-        validatePlaceOrderRequest(dto);
-        
-        Long userId = securityUtil.getCurrentUserId();
-        CartResponseDTO cart = cartService.getCart();
 
-        if (cart.getItems() == null || cart.getItems().isEmpty()) {
-            throw new OrderException("Cart is empty. Cannot place order.");
+        try {
+            validatePlaceOrderRequest(dto);
+
+            Long userId = securityUtil.getCurrentUserId();
+            CartResponseDTO cart = cartService.getCart();
+
+            if (cart.getItems() == null || cart.getItems().isEmpty()) {
+                throw new OrderException("Cart is empty. Cannot place order.");
+            }
+
+            Address address = addressRepository.findById(Math.toIntExact(dto.getAddressId()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
+
+            validateAddressOwnership(address);
+
+            BigDecimal subtotal = cart.getPriceSummary().getSubtotal();
+            BigDecimal shippingAmount = cart.getPriceSummary().getDeliveryCharge();
+            BigDecimal discountAmount = cart.getPriceSummary().getDiscount();
+            BigDecimal finalAmount = cart.getPriceSummary().getFinalTotal();
+
+            Order order = createOrder(userId, dto, address, subtotal, shippingAmount, discountAmount, finalAmount);
+            order = orderRepository.saveAndFlush(order);
+
+            List<OrderItemDTO> itemDTOList = createOrderItems(order, cart.getItems());
+            orderItemRepository.flush();
+
+            clearCartSafely(userId);
+
+            log.info("[ORDER] placeOrder DONE orderId={} orderNumber={} paymentStatus=pending (pay next)",
+                    order.getId(), order.getOrderNumber());
+            return buildOrderResponse(order, itemDTOList);
+        } catch (Exception e) {
+            log.error("[ORDER] placeOrder FAILED: {}", e.getMessage(), e);
+            throw e;
         }
-
-        Address address = addressRepository.findById(Math.toIntExact(dto.getAddressId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Address not found"));
-
-        validateAddressOwnership(address);
-
-        BigDecimal subtotal = cart.getPriceSummary().getSubtotal();
-        BigDecimal shippingAmount = cart.getPriceSummary().getDeliveryCharge();
-        BigDecimal discountAmount = cart.getPriceSummary().getDiscount();
-        BigDecimal finalAmount = cart.getPriceSummary().getFinalTotal();
-
-        Order order = createOrder(userId, dto, address, subtotal, shippingAmount, discountAmount, finalAmount);
-        order = orderRepository.save(order);
-
-        List<OrderItemDTO> itemDTOList = createOrderItems(order, cart.getItems());
-
-        cartService.clearCart();
-        log.info("Order placed successfully: orderId={}, orderNumber={}", order.getId(), order.getOrderNumber());
-
-        return buildOrderResponse(order, itemDTOList);
     }
 
     @Override
@@ -162,7 +174,7 @@ public class OrderServiceImpl implements OrderService {
         return Order.builder()
                 .userId(userId)
                 .orderNumber(orderNumber)
-                .totalAmount(subtotal.doubleValue())
+                .totalAmount(finalAmount.doubleValue())
                 .shippingAmount(shippingAmount.doubleValue())
                 .discountAmount(discountAmount.doubleValue())
                 .taxAmount(0.0)
@@ -181,6 +193,14 @@ public class OrderServiceImpl implements OrderService {
                 .build();
     }
 
+    private void clearCartSafely(Long userId) {
+        try {
+            cartRepository.deleteByUser_Id(userId);
+        } catch (Exception e) {
+            log.warn("[ORDER] cart clear failed after order persist userId={}: {}", userId, e.getMessage());
+        }
+    }
+
     private String generateOrderNumber() {
         return "ORD-" + System.currentTimeMillis();
     }
@@ -189,6 +209,10 @@ public class OrderServiceImpl implements OrderService {
         List<OrderItemDTO> itemDTOList = new ArrayList<>();
 
         for (CartItemResponseDTO cartItem : cartItems) {
+            Long sellerId = productRepository.findById(cartItem.getProductId())
+                    .map(Product::getSellerId)
+                    .orElse(null);
+
             OrderItem item = OrderItem.builder()
                     .orderId(order.getId())
                     .productId(cartItem.getProductId())
@@ -198,6 +222,7 @@ public class OrderServiceImpl implements OrderService {
                     .total(cartItem.getTotal().doubleValue())
                     .status("processing")
                     .productImagePath(cartItem.getImageUrl())
+                    .sellerId(sellerId)
                     .build();
 
             item = orderItemRepository.save(item);
@@ -232,12 +257,16 @@ public class OrderServiceImpl implements OrderService {
                 .paymentMethod(order.getPaymentMethod())
                 .createdDate(formatDateTime(order.getCreatedAt()))
                 .shippingAddress(buildShippingAddress(order))
+                .shiprocketAwbCode(order.getShiprocketAwbCode())
+                .shiprocketTrackingUrl(order.getShiprocketTrackingUrl())
+                .shiprocketCourierName(order.getShiprocketCourierName())
+                .shiprocketStatus(order.getShiprocketStatus())
                 .build();
     }
 
     private OrderResponseDTO buildOrderSummaryResponse(Order order) {
         List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
-        
+
         return OrderResponseDTO.builder()
                 .orderId(order.getId())
                 .orderNumber(order.getOrderNumber())
@@ -245,8 +274,13 @@ public class OrderServiceImpl implements OrderService {
                 .paymentStatus(order.getPaymentStatus())
                 .totalAmount(order.getTotalAmount())
                 .finalAmount(order.getTotalAmount())
+                .totalItems(items.size())
                 .firstProductImage(items.isEmpty() ? null : items.get(0).getProductImagePath())
                 .createdDate(formatDateTime(order.getCreatedAt()))
+                .shiprocketAwbCode(order.getShiprocketAwbCode())
+                .shiprocketTrackingUrl(order.getShiprocketTrackingUrl())
+                .shiprocketCourierName(order.getShiprocketCourierName())
+                .shiprocketStatus(order.getShiprocketStatus())
                 .build();
     }
 
@@ -264,6 +298,10 @@ public class OrderServiceImpl implements OrderService {
                 .items(itemDTOList)
                 .shippingAddress(buildShippingAddress(order))
                 .createdDate(formatDateTime(order.getCreatedAt()))
+                .shiprocketAwbCode(order.getShiprocketAwbCode())
+                .shiprocketTrackingUrl(order.getShiprocketTrackingUrl())
+                .shiprocketCourierName(order.getShiprocketCourierName())
+                .shiprocketStatus(order.getShiprocketStatus())
                 .build();
     }
 
@@ -284,19 +322,29 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public Order markOrderAsPaid(String razorpayOrderId, String paymentId) {
 
-        Order order = orderRepository.findByRazorpayOrderId(razorpayOrderId)
-                .orElseThrow(() -> new RuntimeException("Order not found"));
+        List<Order> matches = orderRepository.findByRazorpayOrderIdOrderByCreatedAtDesc(razorpayOrderId);
+        if (matches.isEmpty()) {
+            throw new RuntimeException("Order not found");
+        }
+        if (matches.size() > 1) {
+            log.warn("[ORDER] markOrderAsPaid duplicate razorpayOrderId={} count={} -> choosing latest orderId={}",
+                    razorpayOrderId, matches.size(), matches.get(0).getId());
+        }
+        Order order = matches.get(0);
 
         order.setPaymentStatus("paid");
         order.setOrderStatus("processing");
         order.setRazorpayPaymentId(paymentId);
 
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+        log.info("[ORDER] markOrderAsPaid orderNumber={} orderId={} paymentStatus=paid razorpayPaymentId={}",
+                saved.getOrderNumber(), saved.getId(), paymentId);
+        return saved;
     }
 
     @Override
     @Transactional
-    public void updateShipment(String orderNumber, String awb, String courier, String trackingUrl) {
+    public void updateShipment(String orderNumber, String awb, String courier, String trackingUrl, String shiprocketStatus) {
 
         Order order = orderRepository.findByOrderNumber(orderNumber)
                 .orElseThrow(() -> new RuntimeException("Order not found"));
@@ -304,49 +352,68 @@ public class OrderServiceImpl implements OrderService {
         order.setShiprocketAwbCode(awb);
         order.setShiprocketCourierName(courier);
         order.setShiprocketTrackingUrl(trackingUrl);
-        order.setShiprocketStatus("shipped");
+        order.setShiprocketStatus(shiprocketStatus != null ? shiprocketStatus : "label_created");
         order.setOrderStatus("processing");
 
         orderRepository.save(order);
+        log.info("[ORDER] updateShipment orderNumber={} awb={} shiprocketStatus={} trackingUrl={}",
+                orderNumber, awb, order.getShiprocketStatus(), trackingUrl);
+    }
+
+    @Override
+    @Transactional
+    public void markShiprocketCreateFailed(String orderNumber, String reason) {
+        orderRepository.findByOrderNumber(orderNumber).ifPresentOrElse(order -> {
+            order.setShiprocketStatus("create_failed");
+            if (order.getShiprocketAwbCode() != null && order.getShiprocketAwbCode().startsWith("TEMP_AWB_")) {
+                order.setShiprocketAwbCode(null);
+                order.setShiprocketTrackingUrl(null);
+            }
+            orderRepository.save(order);
+            log.warn("[ORDER] markShiprocketCreateFailed orderNumber={} reason={}", orderNumber, reason);
+        }, () -> log.warn("[ORDER] markShiprocketCreateFailed no order for orderNumber={}", orderNumber));
     }
 
     @Override
     @Transactional
     public void updateOrderStatusFromWebhook(String awb, String status) {
-        log.info("Updating order status from webhook: AWB={}, Status={}", awb, status);
-        
+        log.info("[ORDER:WEBHOOK] update status awb={} shiprocketStatus={}", awb, status);
+
         try {
             Order order = orderRepository.findByShiprocketAwbCode(awb)
                     .orElseThrow(() -> new RuntimeException("Order not found for AWB: " + awb));
 
-            // Map Shiprocket status to our order status
             String mappedStatus = mapShiprocketStatus(status);
             order.setOrderStatus(mappedStatus);
-            
+            if (status != null && !status.isBlank()) {
+                order.setShiprocketStatus(status);
+            }
+
             orderRepository.save(order);
-            
-            log.info("Order status updated: OrderNumber={}, NewStatus={}", order.getOrderNumber(), mappedStatus);
+
+            log.info("[ORDER:WEBHOOK] updated orderNumber={} orderStatus={} shiprocketStatus={}",
+                    order.getOrderNumber(), mappedStatus, order.getShiprocketStatus());
         } catch (Exception e) {
-            log.warn("Failed to update order status from webhook AWB={}: {}", awb, e.getMessage());
-            // Don't throw exception - webhook processing should continue
+            log.warn("[ORDER:WEBHOOK] failed awb={}: {}", awb, e.getMessage());
         }
     }
 
     @Override
     @Transactional
     public void linkRazorpayOrder(String razorpayOrderId) {
-        log.info("Linking Razorpay order ID: {}", razorpayOrderId);
-        
-        // get latest pending order
-        Order order = orderRepository
-                .findTopByPaymentStatusOrderByCreatedAtDesc("pending")
+        log.info("[ORDER] linkRazorpayOrder start razorpayOrderId={}", razorpayOrderId);
+
+        Optional<Long> maybeUserId = securityUtil.tryGetCurrentUserId();
+        Order order = maybeUserId
+                .flatMap(uid -> orderRepository.findTopByUserIdAndPaymentStatusOrderByCreatedAtDesc(uid, "pending"))
+                .or(() -> orderRepository.findTopByPaymentStatusOrderByCreatedAtDesc("pending"))
                 .orElseThrow(() -> new RuntimeException("No pending order found"));
 
         order.setRazorpayOrderId(razorpayOrderId);
         orderRepository.save(order);
-        
-        log.info("Razorpay order linked: OrderNumber={}, RazorpayOrderId={}", 
-            order.getOrderNumber(), razorpayOrderId);
+
+        log.info("[ORDER] linkRazorpayOrder done orderNumber={} orderId={} userScope={} paymentStatus=pending (awaiting verify)",
+                order.getOrderNumber(), order.getId(), maybeUserId.isPresent());
     }
 
     private String mapShiprocketStatus(String shiprocketStatus) {
