@@ -12,7 +12,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 
 @Service
 public class RazorpayServiceImpl implements RazorpayService {
@@ -64,7 +69,7 @@ public class RazorpayServiceImpl implements RazorpayService {
             );
 
             JSONObject options = new JSONObject();
-            options.put("amount", (int) (amount * 100));
+            options.put("amount", (int) Math.round(amount * 100.0));
             options.put("currency", "INR");
             options.put("receipt", "txn_" + System.currentTimeMillis());
 
@@ -90,9 +95,35 @@ public class RazorpayServiceImpl implements RazorpayService {
         }
     }
 
-    // VERIFY PAYMENT
     @Override
     public boolean verifyPayment(String orderId, String paymentId, String signature) {
-        return true; // FORCE SUCCESS FOR TESTING
+        if (!StringUtils.hasText(orderId) || !StringUtils.hasText(paymentId) || !StringUtils.hasText(signature)) {
+            return false;
+        }
+        try {
+            String secret = resolveKeySecret();
+            String payload = orderId + "|" + paymentId;
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] digest = mac.doFinal(payload.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                hex.append(String.format("%02x", b & 0xff));
+            }
+            return constantTimeEquals(hex.toString(), signature.trim().toLowerCase());
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            throw new RuntimeException("Could not verify Razorpay signature", e);
+        }
+    }
+
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null || a.length() != b.length()) {
+            return false;
+        }
+        int r = 0;
+        for (int i = 0; i < a.length(); i++) {
+            r |= a.charAt(i) ^ b.charAt(i);
+        }
+        return r == 0;
     }
 }

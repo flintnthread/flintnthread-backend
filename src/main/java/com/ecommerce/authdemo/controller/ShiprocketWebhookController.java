@@ -1,6 +1,5 @@
 package com.ecommerce.authdemo.controller;
 
-import com.ecommerce.authdemo.service.OrderService;
 import com.ecommerce.authdemo.service.ShiprocketService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,56 +17,58 @@ import java.util.Map;
 public class ShiprocketWebhookController {
 
     private final ShiprocketService shiprocketService;
-    private final OrderService orderService;
 
     @PostMapping("/webhook")
     public ResponseEntity<Map<String, Object>> receiveWebhook(
             @RequestBody(required = false) Map<String, Object> payload) {
+        log.info("[SHIPROCKET:WEBHOOK] HTTP POST /api/shiprocket/webhook received payloadSize={}",
+                payload == null ? 0 : payload.size());
         try {
-            log.info("Received Shiprocket webhook: {}", payload);
-            
             if (payload == null) {
+                log.warn("[SHIPROCKET:WEBHOOK] empty body");
                 return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "message", "Empty webhook payload"
+                        "success", false,
+                        "message", "Empty webhook payload"
                 ));
             }
 
-            // Process webhook data
             shiprocketService.handleWebhook(payload);
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Webhook processed successfully",
-                "processed", true
-            ));
-            
+
+            Map<String, Object> ok = new HashMap<>();
+            ok.put("success", true);
+            ok.put("message", "Webhook processed successfully");
+            ok.put("processed", true);
+            log.info("[SHIPROCKET:WEBHOOK] HTTP 200 processed=true");
+            return ResponseEntity.ok(ok);
+
         } catch (Exception e) {
-            log.error("Failed to process Shiprocket webhook", e);
+            log.error("[SHIPROCKET:WEBHOOK] HTTP 500 {}", e.getMessage(), e);
             return ResponseEntity.internalServerError().body(Map.of(
-                "success", false,
-                "message", "Failed to process webhook",
-                "processed", false
+                    "success", false,
+                    "message", "Failed to process webhook",
+                    "processed", false
             ));
         }
     }
 
     @GetMapping("/track/{awb}")
     public ResponseEntity<Map<String, Object>> trackShipment(@PathVariable String awb) {
+        log.info("[SHIPROCKET:API] HTTP GET /api/shiprocket/track/{}", awb);
         try {
             String trackingInfo = shiprocketService.trackShipment(awb);
-            
-            return ResponseEntity.ok(Map.of(
-                "success", true,
-                "message", "Tracking information retrieved",
-                "data", trackingInfo
-            ));
-            
+
+            Map<String, Object> body = new HashMap<>();
+            body.put("success", true);
+            body.put("message", "Tracking information retrieved");
+            body.put("data", trackingInfo);
+            log.info("[SHIPROCKET:API] track OK awb={} dataLength={}", awb, trackingInfo != null ? trackingInfo.length() : 0);
+            return ResponseEntity.ok(body);
+
         } catch (Exception e) {
-            log.error("Failed to track shipment AWB: {}", awb, e);
+            log.error("[SHIPROCKET:API] track FAILED awb={} msg={}", awb, e.getMessage());
             return ResponseEntity.internalServerError().body(Map.of(
-                "success", false,
-                "message", "Failed to track shipment"
+                    "success", false,
+                    "message", "Failed to track shipment"
             ));
         }
     }

@@ -13,10 +13,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByUserIdAndOrderStatusOrderByCreatedAtDesc(Long userId, String status);
 
     Optional<Order> findByRazorpayOrderId(String razorpayOrderId);
+    List<Order> findByRazorpayOrderIdOrderByCreatedAtDesc(String razorpayOrderId);
 
     Optional<Order> findByOrderNumber(String orderNumber);
 
     Optional<Order> findByShiprocketAwbCode(String shiprocketAwbCode);
 
     Optional<Order> findTopByPaymentStatusOrderByCreatedAtDesc(String status);
+
+    Optional<Order> findTopByUserIdAndPaymentStatusOrderByCreatedAtDesc(Long userId, String paymentStatus);
 }
