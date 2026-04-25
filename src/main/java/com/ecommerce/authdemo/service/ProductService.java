@@ -21,6 +21,7 @@ public interface ProductService {
 
     List<ProductDTO> getRecentProducts();
     List<ProductDTO> getRecentProductsByMainCategory(Long mainCategoryId);
+    List<ProductDTO> getLatestProductsByMainCategory(Long mainCategoryId);
 
     List<ProductDTO> getPopularProducts();
     List<ProductDTO> getPopularProductsByMainCategory(Long mainCategoryId);
@@ -48,6 +49,13 @@ public interface ProductService {
 
     List<ProductDTO> getTopDiscountProducts();
     List<ProductDTO> getDiscountProductsByMainCategoryAsc(Long mainCategoryId);
+    List<ProductDTO> getProductsByMainCategoryAndExactDiscountPercentage(Long mainCategoryId, Double discountPercentage);
+    List<ProductDTO> getProductsByMainCategoryWithDiscountLessThanEqual(Long mainCategoryId, Double maxDiscountPercentage);
+    List<ProductDTO> getSpotlightProductsByMainCategory(Long mainCategoryId);
+    List<ProductDTO> getUniqueProductsByMainCategory(Long mainCategoryId);
+    List<ProductDTO> getTopCollectionsByMainCategory(Long mainCategoryId);
+    List<ProductDTO> getRecommendedProductsByMainCategory(Long mainCategoryId, Long userId, String sessionId);
+    List<ProductDTO> getRecentlyViewedProductsByMainCategory(Long mainCategoryId, Long userId, String sessionId);
 
     List<ProductDTO> getByMainCategory(Long mainCategoryId);
 
