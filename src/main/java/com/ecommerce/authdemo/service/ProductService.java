@@ -56,6 +56,7 @@ public interface ProductService {
     List<ProductDTO> getTopCollectionsByMainCategory(Long mainCategoryId);
     List<ProductDTO> getRecommendedProductsByMainCategory(Long mainCategoryId, Long userId, String sessionId);
     List<ProductDTO> getRecentlyViewedProductsByMainCategory(Long mainCategoryId, Long userId, String sessionId);
+    List<ProductDTO> getRecentlyViewedProducts(Long userId, String sessionId);
 
     List<ProductDTO> getByMainCategory(Long mainCategoryId);
 

@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/search")
 @RequiredArgsConstructor
@@ -29,9 +31,11 @@ public class SearchController {
     public ResponseEntity<ApiResponse<SearchResponseDTO>> searchProducts(
             @RequestParam
             @NotBlank(message = "Keyword is required")
-            String keyword) {
+            String keyword,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String sessionId) {
 
-        ApiResponse<SearchResponseDTO> response = searchService.search(keyword);
+        ApiResponse<SearchResponseDTO> response = searchService.search(keyword, userId, sessionId);
         return ResponseEntity.ok(response);
     }
 
@@ -71,11 +75,13 @@ public class SearchController {
     @GetMapping("/page")
     public ResponseEntity<ApiResponse<Page<SearchResponseDTO>>> searchWithPagination(
             @RequestParam String keyword,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String sessionId,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Min(1) int size) {
 
         ApiResponse<Page<SearchResponseDTO>> response =
-                searchService.searchWithPagination(keyword, page, size);
+                searchService.searchWithPagination(keyword, userId, sessionId, page, size);
 
         return ResponseEntity.ok(response);
     }
@@ -87,12 +93,30 @@ public class SearchController {
     */
     @GetMapping("/voice")
     public ResponseEntity<ApiResponse<SearchResponseDTO>> voiceSearch(
-            @RequestParam String keyword) {
+            @RequestParam String keyword,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String sessionId) {
 
         ApiResponse<SearchResponseDTO> response =
-                searchService.voiceSearch(keyword);
+                searchService.voiceSearch(keyword, userId, sessionId);
 
         return ResponseEntity.ok(response);
 
+    }
+
+    @GetMapping("/history")
+    public ResponseEntity<ApiResponse<List<String>>> getSearchHistory(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String sessionId) {
+        ApiResponse<List<String>> response = searchService.getSearchHistory(userId, sessionId);
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/history")
+    public ResponseEntity<ApiResponse<String>> clearSearchHistory(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String sessionId) {
+        ApiResponse<String> response = searchService.clearSearchHistory(userId, sessionId);
+        return ResponseEntity.ok(response);
     }
 }
