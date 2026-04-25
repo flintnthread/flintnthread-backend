@@ -1,9 +1,10 @@
 package com.ecommerce.authdemo.controller;
 
+import com.ecommerce.authdemo.dto.ShiprocketShipmentResult;
+import com.ecommerce.authdemo.entity.Order;
 import com.ecommerce.authdemo.service.OrderService;
 import com.ecommerce.authdemo.service.RazorpayService;
 import com.ecommerce.authdemo.service.ShiprocketService;
-import com.ecommerce.authdemo.entity.Order;
 import lombok.RequiredArgsConstructor;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Value;
@@ -55,9 +56,6 @@ public class PaymentController {
         return null;
     }
 
-    /**
-     * Browsers and some clients call URLs with GET. Payment creation must be POST only.
-     */
     @GetMapping("/create-order")
     public ResponseEntity<Map<String, Object>> createOrderGetNotAllowed() {
         Map<String, Object> body = new HashMap<>();
@@ -79,7 +77,6 @@ public class PaymentController {
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(body);
     }
 
-    // 1. CREATE ORDER — amount: query ?amount=100 and/or JSON body {"amount":100}
     @PostMapping("/create-order")
     public ResponseEntity<?> createOrder(
             @RequestParam(required = false) Double amount,
@@ -94,10 +91,9 @@ public class PaymentController {
             return ResponseEntity.badRequest().body(err);
         }
 
+        logger.info("[PAYMENT] create-order START amountInr={}", resolved);
         try {
             JSONObject order = razorpayService.createOrder(resolved);
-
-            // 🔥 IMPORTANT: Link Razorpay order ID with DB order
             String razorpayOrderId = order.get("id").toString();
             orderService.linkRazorpayOrder(razorpayOrderId);
 
@@ -107,60 +103,72 @@ public class PaymentController {
             response.put("data", order.toMap());
             response.put("razorpayKeyId", razorpayKeyId);
 
+            logger.info("[PAYMENT] create-order DONE razorpayOrderId={}", razorpayOrderId);
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-
+            logger.error("[PAYMENT] create-order FAILED: {}", e.getMessage(), e);
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", "Failed to create order");
-
             return ResponseEntity.internalServerError().body(response);
         }
     }
 
-    // 2. VERIFY PAYMENT
     @PostMapping("/verify")
     public ResponseEntity<?> verifyPayment(
             @RequestParam String orderId,
             @RequestParam String paymentId,
             @RequestParam String signature) {
 
+        logger.info("[PAYMENT] verify START razorpayOrderId={} paymentId={}", orderId, paymentId);
+
         try {
             boolean success = razorpayService.verifyPayment(orderId, paymentId, signature);
+            logger.info("[PAYMENT] verify razorpay signature result success={}", success);
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", success);
             response.put("message", success ? "Payment successful" : "Payment failed");
 
-            // AFTER PAYMENT SUCCESS: Update order → Call shipping → Save tracking
             if (success) {
                 try {
-                    // Update order as paid
+                    logger.info("[PAYMENT] verify markOrderAsPaid START razorpayOrderId={}", orderId);
                     Order paidOrder = orderService.markOrderAsPaid(orderId, paymentId);
+                    logger.info("[PAYMENT] verify markOrderAsPaid DONE orderNumber={}", paidOrder.getOrderNumber());
 
-                    // Create shipment with Shiprocket
-                    shiprocketService.createShipment(paidOrder);
+                    try {
+                        logger.info("[PAYMENT] verify Shiprocket createShipment START orderNumber={}", paidOrder.getOrderNumber());
+                        ShiprocketShipmentResult sr = shiprocketService.createShipment(paidOrder);
+                        logger.info("[PAYMENT] verify Shiprocket createShipment DONE shipmentId={} awb={}",
+                                sr.getShipmentId(), sr.getAwbCode());
 
-                    response.put("shipping_initiated", true);
-                    response.put("order_number", paidOrder.getOrderNumber());
-
-                } catch (Exception shippingError) {
-                    // Log shipping error but don't fail the payment verification
-                    logger.error("Payment successful but shipping failed: {}", shippingError.getMessage());
-                    response.put("shipping_initiated", false);
-                    response.put("shipping_error", "Shipping will be processed later");
+                        response.put("shipping_initiated", true);
+                        response.put("order_number", paidOrder.getOrderNumber());
+                        response.put("shiprocket", sr.toMap());
+                    } catch (Exception shippingError) {
+                        logger.error("[PAYMENT] verify Shiprocket FAILED (payment still ok) orderNumber={}",
+                                paidOrder.getOrderNumber(), shippingError);
+                        response.put("shipping_initiated", false);
+                        response.put("order_number", paidOrder.getOrderNumber());
+                        response.put("shipping_error", "Shiprocket order could not be created. Order is paid; retry shipment from admin.");
+                        response.put("shipping_error_detail", shippingError.getMessage());
+                    }
+                } catch (Exception markPaidError) {
+                    logger.error("[PAYMENT] verify markOrderAsPaid FAILED razorpayOrderId={}", orderId, markPaidError);
+                    response.put("success", false);
+                    response.put("message", "Payment verified but order update failed: " + markPaidError.getMessage());
                 }
             }
 
+            logger.info("[PAYMENT] verify END success={} keys={}", response.get("success"), response.keySet());
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-
+            logger.error("[PAYMENT] verify ERROR: {}", e.getMessage(), e);
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", "Error verifying payment");
-
             return ResponseEntity.internalServerError().body(response);
         }
     }

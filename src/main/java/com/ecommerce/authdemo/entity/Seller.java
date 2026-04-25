@@ -29,6 +29,19 @@ public class Seller {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    /** Registered business name (often matches a Shiprocket pickup nickname). */
+    @Column(name = "business_name", insertable = false, updatable = false)
+    private String businessName;
+
+    @Column(name = "branch_name", insertable = false, updatable = false)
+    private String branchName;
+
+    @Column(name = "address", columnDefinition = "TEXT", insertable = false, updatable = false)
+    private String address;
+
+    @Column(name = "warehouse_address", columnDefinition = "TEXT", insertable = false, updatable = false)
+    private String warehouseAddress;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();

@@ -54,7 +54,7 @@ public class OrderController {
     public ResponseEntity<ApiResponse<List<OrderResponseDTO>>> getOrders(
             @RequestParam(required = false) String status) {
         
-        log.info("Fetch orders request: status={}", status);
+        log.info("[ORDER:API] GET /api/orders status={}", status);
         
         try {
             List<OrderResponseDTO> orders = orderService.getUserOrders(status);

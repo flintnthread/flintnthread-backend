@@ -18,7 +18,9 @@ public interface OrderService {
 
     Order markOrderAsPaid(String razorpayOrderId, String paymentId);
 
-    void updateShipment(String orderNumber, String awb, String courier, String trackingUrl);
+    void updateShipment(String orderNumber, String awb, String courier, String trackingUrl, String shiprocketStatus);
+
+    void markShiprocketCreateFailed(String orderNumber, String reason);
 
     void updateOrderStatusFromWebhook(String awb, String status);
 

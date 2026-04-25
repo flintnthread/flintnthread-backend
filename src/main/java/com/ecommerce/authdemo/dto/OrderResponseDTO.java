@@ -28,4 +28,10 @@ public class OrderResponseDTO {
     private String shippingAddress;
 
     private List<OrderItemDTO> items;
+
+    /** Shiprocket / logistics (null until created or on failure). */
+    private String shiprocketAwbCode;
+    private String shiprocketTrackingUrl;
+    private String shiprocketCourierName;
+    private String shiprocketStatus;
 }
