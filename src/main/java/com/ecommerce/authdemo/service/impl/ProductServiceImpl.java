@@ -17,7 +17,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -69,6 +71,14 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public List<ProductDTO> getRecentProductsByMainCategory(Long mainCategoryId) {
         return productRepo.findRecentProductsByMainCategory(mainCategoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getLatestProductsByMainCategory(Long mainCategoryId) {
+        return productRepo.findLatestProductsByMainCategory(mainCategoryId)
                 .stream()
                 .map(mapper::toDTO)
                 .toList();
@@ -212,6 +222,63 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public List<ProductDTO> getProductsByMainCategoryAndExactDiscountPercentage(Long mainCategoryId, Double discountPercentage) {
+        return productRepo.findProductsByMainCategoryAndExactDiscountPercentage(mainCategoryId, discountPercentage)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getProductsByMainCategoryWithDiscountLessThanEqual(Long mainCategoryId, Double maxDiscountPercentage) {
+        return productRepo.findProductsByMainCategoryWithDiscountLessThanEqual(mainCategoryId, maxDiscountPercentage)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getSpotlightProductsByMainCategory(Long mainCategoryId) {
+        return productRepo.findSpotlightProductsByMainCategory(mainCategoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getUniqueProductsByMainCategory(Long mainCategoryId) {
+        return productRepo.findUniqueProductsByMainCategory(mainCategoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getTopCollectionsByMainCategory(Long mainCategoryId) {
+        return productRepo.findTopCollectionsByMainCategory(mainCategoryId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getRecommendedProductsByMainCategory(Long mainCategoryId, Long userId, String sessionId) {
+        return productRepo.findRecommendedProductsByMainCategory(mainCategoryId, userId, sessionId)
+                .stream()
+                .map(mapper::toDTO)
+                .toList();
+    }
+
+    @Override
+    public List<ProductDTO> getRecentlyViewedProductsByMainCategory(Long mainCategoryId, Long userId, String sessionId) {
+        List<Long> productIds = productRepo.findRecentlyViewedProductIdsByMainCategory(mainCategoryId, userId, sessionId);
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+        return mapProductsByIdOrder(productIds);
+    }
+
+    @Override
     public List<ProductDTO> getByMainCategory(Long mainCategoryId) {
         return productRepo.findByMainCategoryFull(mainCategoryId)
                 .stream()
@@ -269,6 +336,16 @@ public class ProductServiceImpl implements ProductService {
         return colorIdsOrNames.stream()
                 .map(sizeColorMapper::getColorName)
                 .distinct()
+                .toList();
+    }
+
+    private List<ProductDTO> mapProductsByIdOrder(List<Long> productIds) {
+        List<Product> products = productRepo.findAllById(productIds);
+        Map<Long, ProductDTO> dtoById = new LinkedHashMap<>();
+        products.forEach(product -> dtoById.put(product.getId(), mapper.toDTO(product)));
+        return productIds.stream()
+                .map(dtoById::get)
+                .filter(java.util.Objects::nonNull)
                 .toList();
     }
 

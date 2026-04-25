@@ -138,6 +138,11 @@ public class ProductController {
         return productService.getRecentProductsByMainCategory(mainCategoryId);
     }
 
+    @GetMapping("/main-category/{mainCategoryId}/latest")
+    public List<ProductDTO> latestByMainCategory(@PathVariable Long mainCategoryId) {
+        return productService.getLatestProductsByMainCategory(mainCategoryId);
+    }
+
     @GetMapping("/popular")
     public List<ProductDTO> popular() {
         return productService.getPopularProducts();
@@ -206,6 +211,55 @@ public class ProductController {
     @GetMapping("/main-category/{mainCategoryId}/discount/asc")
     public List<ProductDTO> getDiscountProductsByMainCategoryAsc(@PathVariable Long mainCategoryId) {
         return productService.getDiscountProductsByMainCategoryAsc(mainCategoryId);
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}/discount/percentage/{discountPercentage}")
+    public List<ProductDTO> getProductsByMainCategoryAndExactDiscountPercentage(
+            @PathVariable Long mainCategoryId,
+            @PathVariable Double discountPercentage
+    ) {
+        return productService.getProductsByMainCategoryAndExactDiscountPercentage(mainCategoryId, discountPercentage);
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}/discount/upto/{maxDiscountPercentage}")
+    public List<ProductDTO> getProductsByMainCategoryWithDiscountLessThanEqual(
+            @PathVariable Long mainCategoryId,
+            @PathVariable Double maxDiscountPercentage
+    ) {
+        return productService.getProductsByMainCategoryWithDiscountLessThanEqual(mainCategoryId, maxDiscountPercentage);
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}/spotlight")
+    public List<ProductDTO> getSpotlightProductsByMainCategory(@PathVariable Long mainCategoryId) {
+        return productService.getSpotlightProductsByMainCategory(mainCategoryId);
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}/unique")
+    public List<ProductDTO> getUniqueProductsByMainCategory(@PathVariable Long mainCategoryId) {
+        return productService.getUniqueProductsByMainCategory(mainCategoryId);
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}/top-collections")
+    public List<ProductDTO> getTopCollectionsByMainCategory(@PathVariable Long mainCategoryId) {
+        return productService.getTopCollectionsByMainCategory(mainCategoryId);
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}/recommended")
+    public List<ProductDTO> getRecommendedProductsByMainCategory(
+            @PathVariable Long mainCategoryId,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String sessionId
+    ) {
+        return productService.getRecommendedProductsByMainCategory(mainCategoryId, userId, sessionId);
+    }
+
+    @GetMapping("/main-category/{mainCategoryId}/recently-viewed")
+    public List<ProductDTO> getRecentlyViewedProductsByMainCategory(
+            @PathVariable Long mainCategoryId,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String sessionId
+    ) {
+        return productService.getRecentlyViewedProductsByMainCategory(mainCategoryId, userId, sessionId);
     }
 
     @GetMapping("/main-category/{mainCategoryId}")
