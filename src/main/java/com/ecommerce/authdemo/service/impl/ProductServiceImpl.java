@@ -279,6 +279,15 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public List<ProductDTO> getRecentlyViewedProducts(Long userId, String sessionId) {
+        List<Long> productIds = productRepo.findRecentlyViewedProductIds(userId, sessionId);
+        if (productIds == null || productIds.isEmpty()) {
+            return List.of();
+        }
+        return mapProductsByIdOrder(productIds);
+    }
+
+    @Override
     public List<ProductDTO> getByMainCategory(Long mainCategoryId) {
         return productRepo.findByMainCategoryFull(mainCategoryId)
                 .stream()

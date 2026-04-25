@@ -227,6 +227,22 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
             @Param("sessionId") String sessionId
     );
 
+    @Query(value = """
+        SELECT pv.product_id
+        FROM product_views pv
+        WHERE (
+               (:userId IS NOT NULL AND pv.user_id = :userId)
+               OR (:sessionId IS NOT NULL AND :sessionId <> '' AND pv.session_id = :sessionId)
+        )
+        GROUP BY pv.product_id
+        ORDER BY MAX(pv.viewed_at) DESC
+        LIMIT 10
+    """, nativeQuery = true)
+    List<Long> findRecentlyViewedProductIds(
+            @Param("userId") Long userId,
+            @Param("sessionId") String sessionId
+    );
+
     // ---------------- FULL FETCH ----------------
     @Query("""
         SELECT DISTINCT p FROM Product p

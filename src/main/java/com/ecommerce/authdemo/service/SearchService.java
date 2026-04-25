@@ -14,7 +14,7 @@ public interface SearchService {
     🔎 MAIN SEARCH
     -----------------------------------------
     */
-    ApiResponse<SearchResponseDTO> search(String keyword);
+    ApiResponse<SearchResponseDTO> search(String keyword, Long userId, String sessionId);
 
     /*
     -----------------------------------------
@@ -38,6 +38,8 @@ public interface SearchService {
     */
     ApiResponse<Page<SearchResponseDTO>> searchWithPagination(
             String keyword,
+            Long userId,
+            String sessionId,
             int page,
             int size
     );
@@ -47,6 +49,10 @@ public interface SearchService {
     🎤 VOICE SEARCH
     -----------------------------------------
     */
-    ApiResponse<SearchResponseDTO> voiceSearch(String keyword);
+    ApiResponse<SearchResponseDTO> voiceSearch(String keyword, Long userId, String sessionId);
+
+    ApiResponse<List<String>> getSearchHistory(Long userId, String sessionId);
+
+    ApiResponse<String> clearSearchHistory(Long userId, String sessionId);
 
 }

@@ -262,6 +262,14 @@ public class ProductController {
         return productService.getRecentlyViewedProductsByMainCategory(mainCategoryId, userId, sessionId);
     }
 
+    @GetMapping("/recently-viewed")
+    public List<ProductDTO> getRecentlyViewedProducts(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String sessionId
+    ) {
+        return productService.getRecentlyViewedProducts(userId, sessionId);
+    }
+
     @GetMapping("/main-category/{mainCategoryId}")
     public List<ProductDTO> getByMainCategory(@PathVariable Long mainCategoryId) {
         return productService.getByMainCategory(mainCategoryId);
