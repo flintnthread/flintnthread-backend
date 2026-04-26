@@ -109,6 +109,15 @@ public class SecurityConfig {
                         .permitAll()
 
                         // --------------------------------
+                        // REVIEWS
+                        // Public: active list for shoppers. Admin "all" lists stay authenticated.
+                        // --------------------------------
+                        .requestMatchers(HttpMethod.GET, "/api/reviews/product/**")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/reviews")
+                        .permitAll()
+
+                        // --------------------------------
                         // PUBLIC BANNER APIs
                         // --------------------------------
                         .requestMatchers("/api/banners/**")
