@@ -33,8 +33,9 @@ public class SecurityUtil {
         String principal = authentication.getName();
 
         return userRepository.findByEmail(principal)
+                .or(() -> userRepository.findByContactNumber(principal))
                 .orElseThrow(() ->
-                        new ResourceNotFoundException("User not found with email: " + principal)
+                        new ResourceNotFoundException("User not found with identifier: " + principal)
                 );
     }
 
