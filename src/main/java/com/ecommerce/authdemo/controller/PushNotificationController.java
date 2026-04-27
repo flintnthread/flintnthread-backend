@@ -6,6 +6,8 @@ import com.ecommerce.authdemo.dto.PushNotificationResponse;
 import com.ecommerce.authdemo.service.PushNotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,10 +29,20 @@ public class PushNotificationController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<List<PushNotificationResponse>>> getNotifications(
-            @RequestParam(required = false) Integer userId,
+            @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) Boolean isRead) {
         List<PushNotificationResponse> data = pushNotificationService.getNotifications(userId, type, isRead);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Push notifications fetched successfully", data));
+    }
+
+    @GetMapping("/paged")
+    public ResponseEntity<ApiResponse<Page<PushNotificationResponse>>> getNotificationsPaged(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) Boolean isRead,
+            Pageable pageable) {
+        Page<PushNotificationResponse> data = pushNotificationService.getNotificationsPaged(userId, type, isRead, pageable);
         return ResponseEntity.ok(new ApiResponse<>(true, "Push notifications fetched successfully", data));
     }
 
@@ -44,6 +56,18 @@ public class PushNotificationController {
     public ResponseEntity<ApiResponse<PushNotificationResponse>> markAsUnread(@PathVariable Integer id) {
         PushNotificationResponse data = pushNotificationService.markAsUnread(id);
         return ResponseEntity.ok(new ApiResponse<>(true, "Push notification marked as unread", data));
+    }
+
+    @PatchMapping("/read-all")
+    public ResponseEntity<ApiResponse<Integer>> markAllAsRead(@RequestParam Long userId) {
+        int data = pushNotificationService.markAllAsRead(userId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "All notifications marked as read", data));
+    }
+
+    @GetMapping("/unread-count")
+    public ResponseEntity<ApiResponse<Long>> getUnreadCount(@RequestParam Long userId) {
+        long data = pushNotificationService.getUnreadCount(userId);
+        return ResponseEntity.ok(new ApiResponse<>(true, "Unread notification count fetched successfully", data));
     }
 
     @DeleteMapping("/{id}")

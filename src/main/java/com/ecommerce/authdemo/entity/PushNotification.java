@@ -19,7 +19,7 @@ public class PushNotification {
     private Integer id;
 
     @Column(name = "user_id", nullable = false)
-    private Integer userId;
+    private Long userId;
 
     @Column(nullable = false, length = 255)
     private String title;

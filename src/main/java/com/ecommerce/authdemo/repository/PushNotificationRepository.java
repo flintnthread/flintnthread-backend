@@ -1,7 +1,10 @@
 package com.ecommerce.authdemo.repository;
 
 import com.ecommerce.authdemo.entity.PushNotification;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -17,7 +20,30 @@ public interface PushNotificationRepository extends JpaRepository<PushNotificati
               AND (:isRead IS NULL OR p.isRead = :isRead)
             ORDER BY p.createdAt DESC
             """)
-    List<PushNotification> findWithFilters(@Param("userId") Integer userId,
+    List<PushNotification> findWithFilters(@Param("userId") Long userId,
                                            @Param("type") String type,
                                            @Param("isRead") Boolean isRead);
+
+    @Query("""
+            SELECT p
+            FROM PushNotification p
+            WHERE (:userId IS NULL OR p.userId = :userId)
+              AND (:type IS NULL OR LOWER(p.type) = LOWER(:type))
+              AND (:isRead IS NULL OR p.isRead = :isRead)
+            """)
+    Page<PushNotification> findPageWithFilters(@Param("userId") Long userId,
+                                               @Param("type") String type,
+                                               @Param("isRead") Boolean isRead,
+                                               Pageable pageable);
+
+    @Modifying
+    @Query("""
+            UPDATE PushNotification p
+            SET p.isRead = TRUE, p.readAt = :readAt
+            WHERE p.userId = :userId
+              AND (p.isRead = FALSE OR p.isRead IS NULL)
+            """)
+    int markAllAsReadByUserId(@Param("userId") Long userId, @Param("readAt") java.time.LocalDateTime readAt);
+
+    long countByUserIdAndIsReadFalse(Long userId);
 }
