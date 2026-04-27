@@ -28,6 +28,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     List<Product> findTop10ByOrderByIdDesc();
 
+    List<Product> findTop60ByStatusOrderByCreatedAtDesc(String status);
+    List<Product> findTop300ByStatusOrderByCreatedAtDesc(String status);
+
     Page<Product> findByNameContainingIgnoreCaseAndStatus(String name, String status, Pageable pageable);
 
     // ---------------- SEARCH ----------------

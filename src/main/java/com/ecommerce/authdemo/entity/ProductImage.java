@@ -1,6 +1,7 @@
 package com.ecommerce.authdemo.entity;
 
 import com.ecommerce.authdemo.dto.ProductImageDTO;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -33,6 +34,7 @@ import java.util.List;
 
         @ManyToOne
         @JoinColumn(name = "product_id")
+        @JsonIgnore
         private Product product;
 
     }

@@ -4,6 +4,7 @@ import com.ecommerce.authdemo.dto.SearchResponseDTO;
 import com.ecommerce.authdemo.payload.ApiResponse;
 
 import org.springframework.data.domain.Page;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -50,6 +51,8 @@ public interface SearchService {
     -----------------------------------------
     */
     ApiResponse<SearchResponseDTO> voiceSearch(String keyword, Long userId, String sessionId);
+
+    ApiResponse<SearchResponseDTO> imageSearch(MultipartFile image, Long userId, String sessionId);
 
     ApiResponse<List<String>> getSearchHistory(Long userId, String sessionId);
 
