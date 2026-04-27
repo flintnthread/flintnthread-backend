@@ -8,7 +8,9 @@ import lombok.RequiredArgsConstructor;
 
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -102,6 +104,15 @@ public class SearchController {
 
         return ResponseEntity.ok(response);
 
+    }
+
+    @PostMapping(value = "/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<SearchResponseDTO>> imageSearch(
+            @RequestParam("image") MultipartFile image,
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) String sessionId) {
+        ApiResponse<SearchResponseDTO> response = searchService.imageSearch(image, userId, sessionId);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/history")
