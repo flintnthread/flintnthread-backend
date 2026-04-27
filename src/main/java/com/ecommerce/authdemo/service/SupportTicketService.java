@@ -2,6 +2,7 @@ package com.ecommerce.authdemo.service;
 
 import com.ecommerce.authdemo.dto.SupportTicketRequest;
 import com.ecommerce.authdemo.dto.SupportTicketResponse;
+import com.ecommerce.authdemo.dto.SupportTicketEditRequest;
 
 import java.util.List;
 
@@ -12,5 +13,7 @@ public interface SupportTicketService {
 
     SupportTicketResponse updateStatus(Integer id, String status);
 
-    void delete(Integer id);
+    SupportTicketResponse editByCustomer(Integer id, SupportTicketEditRequest request);
+
+    SupportTicketResponse deleteByCustomer(Integer id);
 }

@@ -2,10 +2,12 @@ package com.ecommerce.authdemo.service.impl;
 
 import com.ecommerce.authdemo.dto.SupportTicketRequest;
 import com.ecommerce.authdemo.dto.SupportTicketResponse;
+import com.ecommerce.authdemo.dto.SupportTicketEditRequest;
 import com.ecommerce.authdemo.entity.SupportTicket;
 import com.ecommerce.authdemo.exception.ResourceNotFoundException;
 import com.ecommerce.authdemo.repository.SupportTicketRepository;
 import com.ecommerce.authdemo.service.SupportTicketService;
+import com.ecommerce.authdemo.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -17,15 +19,17 @@ import java.util.Locale;
 public class SupportTicketServiceImpl implements SupportTicketService {
 
     private final SupportTicketRepository supportTicketRepository;
+    private final SecurityUtil securityUtil;
 
     @Override
     public SupportTicketResponse create(SupportTicketRequest request) {
+        Integer customerId = Math.toIntExact(securityUtil.getCurrentUserId());
+
         SupportTicket entity = SupportTicket.builder()
-                .customerId(request.getCustomerId())
+                .customerId(customerId)
                 .subject(request.getSubject().trim())
                 .type(request.getType().trim())
                 .message(request.getMessage().trim())
-                .orderId(request.getOrderId())
                 .attachmentPath(normalize(request.getAttachmentPath()))
                 .status("open")
                 .build();
@@ -49,10 +53,49 @@ public class SupportTicketServiceImpl implements SupportTicketService {
     }
 
     @Override
-    public void delete(Integer id) {
+    public SupportTicketResponse editByCustomer(Integer id, SupportTicketEditRequest request) {
+        Integer customerId = Math.toIntExact(securityUtil.getCurrentUserId());
+
         SupportTicket entity = supportTicketRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Support ticket not found"));
+
+        if (!customerId.equals(entity.getCustomerId())) {
+            throw new ResourceNotFoundException("Support ticket not found");
+        }
+
+        boolean updated = false;
+
+        if (request.getType() != null && !request.getType().trim().isEmpty()) {
+            entity.setType(request.getType().trim());
+            updated = true;
+        }
+
+        if (request.getMessage() != null && !request.getMessage().trim().isEmpty()) {
+            entity.setMessage(request.getMessage().trim());
+            updated = true;
+        }
+
+        if (!updated) {
+            throw new IllegalArgumentException("At least one field (type/message) is required");
+        }
+
+        return toResponse(supportTicketRepository.save(entity));
+    }
+
+    @Override
+    public SupportTicketResponse deleteByCustomer(Integer id) {
+        Integer customerId = Math.toIntExact(securityUtil.getCurrentUserId());
+
+        SupportTicket entity = supportTicketRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Support ticket not found"));
+
+        if (!customerId.equals(entity.getCustomerId())) {
+            throw new ResourceNotFoundException("Support ticket not found");
+        }
+
+        SupportTicketResponse deleted = toResponse(entity);
         supportTicketRepository.delete(entity);
+        return deleted;
     }
 
     private SupportTicketResponse toResponse(SupportTicket entity) {
@@ -62,7 +105,6 @@ public class SupportTicketServiceImpl implements SupportTicketService {
                 .subject(entity.getSubject())
                 .type(entity.getType())
                 .message(entity.getMessage())
-                .orderId(entity.getOrderId())
                 .attachmentPath(entity.getAttachmentPath())
                 .status(entity.getStatus())
                 .createdAt(entity.getCreatedAt())
