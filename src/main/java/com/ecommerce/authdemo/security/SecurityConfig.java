@@ -164,6 +164,11 @@ public class SecurityConfig {
                         // --------------------------------
                         .requestMatchers("/api/contact/submit")
                         .permitAll()
+                        // --------------------------------
+                        // SUPPORT TICKETS (AUTHENTICATED CREATE)
+                        // --------------------------------
+                        .requestMatchers(HttpMethod.POST, "/api/support-tickets")
+                        .authenticated()
 
                         // --------------------------------
                         // COOKIES POLICY (PUBLIC READ)
