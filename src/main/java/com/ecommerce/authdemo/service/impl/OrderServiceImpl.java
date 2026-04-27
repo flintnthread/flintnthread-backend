@@ -266,6 +266,7 @@ public class OrderServiceImpl implements OrderService {
 
     private OrderResponseDTO buildOrderSummaryResponse(Order order) {
         List<OrderItem> items = orderItemRepository.findByOrderId(order.getId());
+        List<OrderItemDTO> itemDTOList = items.stream().map(this::buildOrderItemDTO).toList();
 
         return OrderResponseDTO.builder()
                 .orderId(order.getId())
@@ -276,6 +277,7 @@ public class OrderServiceImpl implements OrderService {
                 .finalAmount(order.getTotalAmount())
                 .totalItems(items.size())
                 .firstProductImage(items.isEmpty() ? null : items.get(0).getProductImagePath())
+                .items(itemDTOList)
                 .createdDate(formatDateTime(order.getCreatedAt()))
                 .shiprocketAwbCode(order.getShiprocketAwbCode())
                 .shiprocketTrackingUrl(order.getShiprocketTrackingUrl())
