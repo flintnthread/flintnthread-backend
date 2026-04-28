@@ -8,7 +8,7 @@ import lombok.Data;
 @Data
 public class PushNotificationRequest {
     @NotNull(message = "User ID is required")
-    private Integer userId;
+    private Long userId;
 
     @NotBlank(message = "Title is required")
     @Size(max = 255, message = "Title must not exceed 255 characters")

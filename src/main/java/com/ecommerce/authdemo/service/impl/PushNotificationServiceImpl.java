@@ -7,7 +7,10 @@ import com.ecommerce.authdemo.exception.ResourceNotFoundException;
 import com.ecommerce.authdemo.repository.PushNotificationRepository;
 import com.ecommerce.authdemo.service.PushNotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -31,11 +34,17 @@ public class PushNotificationServiceImpl implements PushNotificationService {
     }
 
     @Override
-    public List<PushNotificationResponse> getNotifications(Integer userId, String type, Boolean isRead) {
+    public List<PushNotificationResponse> getNotifications(Long userId, String type, Boolean isRead) {
         return pushNotificationRepository.findWithFilters(userId, normalize(type), isRead)
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Override
+    public Page<PushNotificationResponse> getNotificationsPaged(Long userId, String type, Boolean isRead, Pageable pageable) {
+        return pushNotificationRepository.findPageWithFilters(userId, normalize(type), isRead, pageable)
+                .map(this::toResponse);
     }
 
     @Override
@@ -54,6 +63,17 @@ public class PushNotificationServiceImpl implements PushNotificationService {
         entity.setIsRead(Boolean.FALSE);
         entity.setReadAt(null);
         return toResponse(pushNotificationRepository.save(entity));
+    }
+
+    @Override
+    @Transactional
+    public int markAllAsRead(Long userId) {
+        return pushNotificationRepository.markAllAsReadByUserId(userId, LocalDateTime.now());
+    }
+
+    @Override
+    public long getUnreadCount(Long userId) {
+        return pushNotificationRepository.countByUserIdAndIsReadFalse(userId);
     }
 
     @Override

@@ -111,6 +111,12 @@ public class SecurityConfig {
                         .permitAll()
 
                         // --------------------------------
+                        // PUBLIC PUSH NOTIFICATION APIs
+                        // --------------------------------
+                        .requestMatchers("/api/push-notifications/**")
+                        .permitAll()
+
+                        // --------------------------------
                         // REVIEWS
                         // Public: active list for shoppers. Admin "all" lists stay authenticated.
                         // --------------------------------
