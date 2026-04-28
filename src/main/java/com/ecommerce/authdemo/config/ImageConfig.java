@@ -4,14 +4,22 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-    @Configuration
-    public class ImageConfig implements WebMvcConfigurer {
+import java.nio.file.Path;
 
-        @Override
-        public void addResourceHandlers(ResourceHandlerRegistry registry) {
+@Configuration
+public class ImageConfig implements WebMvcConfigurer {
 
-            registry.addResourceHandler("/images/**")
-                    .addResourceLocations("file:C:/ecommerce-images/");
-        }
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        String invoiceLocation = Path.of(System.getProperty("user.dir"), "invoices")
+                .toUri()
+                .toString();
+
+        registry.addResourceHandler("/images/**")
+                .addResourceLocations("file:C:/ecommerce-images/");
+
+        registry.addResourceHandler("/invoices/**")
+                .addResourceLocations(invoiceLocation);
     }
+}
 

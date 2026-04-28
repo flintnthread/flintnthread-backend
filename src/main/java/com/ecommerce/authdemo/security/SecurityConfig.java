@@ -51,6 +51,8 @@ public class SecurityConfig {
 
                         .requestMatchers("/image/**")
                         .permitAll()
+                        .requestMatchers("/invoices/**")
+                        .permitAll()
 
 
                         // --------------------------------
@@ -146,6 +148,8 @@ public class SecurityConfig {
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/invoices/by-number/**")
                         .permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/invoices")
+                        .authenticated()
 
                         // --------------------------------
                         // SHIPROCKET WEBHOOK (PUBLIC CALLBACK)
@@ -197,7 +201,9 @@ public class SecurityConfig {
                         .hasRole("ADMIN")
                         .requestMatchers("/api/faqs/**")
                         .hasRole("ADMIN")
-                        .requestMatchers("/api/invoices/**")
+                        .requestMatchers(HttpMethod.PUT, "/api/invoices/**")
+                        .hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/invoices/**")
                         .hasRole("ADMIN")
 
                         // --------------------------------
