@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -35,6 +36,16 @@ public class CartController {
             log.error("Cart error: {}", e.getMessage());
             return ResponseEntity.badRequest()
                     .body(new ApiResponse<>(false, e.getMessage(), null));
+        } catch (RuntimeException e) {
+            // `SecurityUtil` throws RuntimeException("User not authenticated") when JWT/session is missing.
+            String msg = e.getMessage() != null ? e.getMessage() : "Failed to add item to cart";
+            if (msg.toLowerCase().contains("not authenticated")) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(new ApiResponse<>(false, msg, null));
+            }
+            log.error("Runtime error adding item to cart: {}", msg, e);
+            return ResponseEntity.internalServerError()
+                    .body(new ApiResponse<>(false, msg, null));
         } catch (Exception e) {
             log.error("Unexpected error adding to cart: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError()

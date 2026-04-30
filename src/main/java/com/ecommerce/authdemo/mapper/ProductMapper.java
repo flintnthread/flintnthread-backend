@@ -94,18 +94,23 @@ public class ProductMapper {
                         vd.setSize(sizeColorMapper.getSizeName(v.getSize()));
                         vd.setSku(v.getSku());
 
-                        vd.setMrpPrice(v.getMrpPrice());
-                        vd.setSellingPrice(v.getSellingPrice());
-                        vd.setFinalPrice(v.getFinalPrice());
+                        Integer stock = v.getStock();
+                        boolean inStock = stock != null && stock > 0;
 
-                        vd.setDiscountPercentage(v.getDiscountPercentage());
-                        vd.setDiscountAmount(v.getDiscountAmount());
+                        // When out of stock, return null price fields so UI can show "Out of stock"
+                        // instead of displaying a price.
+                        vd.setMrpPrice(inStock ? v.getMrpPrice() : null);
+                        vd.setSellingPrice(inStock ? v.getSellingPrice() : null);
+                        vd.setFinalPrice(inStock ? v.getFinalPrice() : null);
+
+                        vd.setDiscountPercentage(inStock ? v.getDiscountPercentage() : null);
+                        vd.setDiscountAmount(inStock ? v.getDiscountAmount() : null);
 
                         vd.setTaxPercentage(v.getTaxPercentage());
                         vd.setTaxAmount(v.getTaxAmount());
 
-                        vd.setStock(v.getStock());
-                        vd.setInStock(v.getStock() != null && v.getStock() > 0);
+                        vd.setStock(stock);
+                        vd.setInStock(inStock);
 
                         vd.setVideoPath(v.getVideoPath());
                         vd.setWeight(v.getWeight());
