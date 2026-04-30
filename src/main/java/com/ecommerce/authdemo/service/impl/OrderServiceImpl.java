@@ -11,6 +11,7 @@ import com.ecommerce.authdemo.repository.OrderRepository;
 import com.ecommerce.authdemo.repository.ProductRepository;
 import com.ecommerce.authdemo.service.CartService;
 import com.ecommerce.authdemo.service.OrderService;
+import com.ecommerce.authdemo.service.ReferralService;
 import com.ecommerce.authdemo.util.SecurityUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ public class OrderServiceImpl implements OrderService {
     private final AddressRepository addressRepository;
     private final ProductRepository productRepository;
     private final SecurityUtil securityUtil;
+    private final ReferralService referralService;
 
     @Override
     @Transactional
@@ -61,9 +63,34 @@ public class OrderServiceImpl implements OrderService {
             BigDecimal shippingAmount = cart.getPriceSummary().getDeliveryCharge();
             BigDecimal discountAmount = cart.getPriceSummary().getDiscount();
             BigDecimal finalAmount = cart.getPriceSummary().getFinalTotal();
+            boolean referralDiscountApplied = false;
+            // Apply referral reward on the next order (one-time), regardless of prior orders.
+            double referralDiscountPercent = 0.0d;
+            try {
+                referralDiscountPercent = referralService.getAvailableReferralDiscountPercentForUser(userId);
+            } catch (Exception e) {
+                log.warn("[ORDER] referral discount lookup failed userId={}: {}", userId, e.getMessage());
+                referralDiscountPercent = 0.0d;
+            }
+            if (referralDiscountPercent > 0) {
+                BigDecimal extraDiscount = subtotal
+                        .multiply(BigDecimal.valueOf(referralDiscountPercent))
+                        .divide(BigDecimal.valueOf(100));
+                discountAmount = discountAmount.add(extraDiscount);
+                finalAmount = subtotal.add(shippingAmount).subtract(discountAmount).max(BigDecimal.ZERO);
+                referralDiscountApplied = true;
+            }
 
             Order order = createOrder(userId, dto, address, subtotal, shippingAmount, discountAmount, finalAmount);
             order = orderRepository.saveAndFlush(order);
+
+            if (referralDiscountApplied) {
+                try {
+                    referralService.markReferralDiscountUsed(userId, order.getId());
+                } catch (Exception e) {
+                    log.warn("[ORDER] referral discount mark-used failed userId={} orderId={}: {}", userId, order.getId(), e.getMessage());
+                }
+            }
 
             List<OrderItemDTO> itemDTOList = createOrderItems(order, cart.getItems());
             orderItemRepository.flush();
@@ -339,6 +366,9 @@ public class OrderServiceImpl implements OrderService {
         order.setRazorpayPaymentId(paymentId);
 
         Order saved = orderRepository.save(order);
+        if (orderRepository.countByUserIdAndPaymentStatus(saved.getUserId(), "paid") == 1) {
+            referralService.confirmReferralOnFirstPaidOrder(saved.getUserId());
+        }
         log.info("[ORDER] markOrderAsPaid orderNumber={} orderId={} paymentStatus=paid razorpayPaymentId={}",
                 saved.getOrderNumber(), saved.getId(), paymentId);
         return saved;

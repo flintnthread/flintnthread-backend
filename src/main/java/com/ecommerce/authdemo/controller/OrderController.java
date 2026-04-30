@@ -46,7 +46,7 @@ public class OrderController {
         } catch (Exception e) {
             log.error("Unexpected error placing order: {}", e.getMessage(), e);
             return ResponseEntity.internalServerError()
-                    .body(new ApiResponse<>(false, "Failed to place order", null));
+                    .body(new ApiResponse<>(false, e.getMessage() != null ? e.getMessage() : "Failed to place order", null));
         }
     }
 
@@ -66,6 +66,14 @@ public class OrderController {
             return ResponseEntity.internalServerError()
                     .body(new ApiResponse<>(false, "Failed to fetch orders", List.of()));
         }
+    }
+
+    /** Support trailing slash `/api/orders/` (some clients send it). */
+    @GetMapping("/")
+    public ResponseEntity<ApiResponse<List<OrderResponseDTO>>> getOrdersSlash(
+            @RequestParam(required = false) String status
+    ) {
+        return getOrders(status);
     }
 
     @GetMapping("/{id}")
