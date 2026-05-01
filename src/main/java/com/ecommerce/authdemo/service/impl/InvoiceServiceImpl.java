@@ -5,18 +5,24 @@ import com.ecommerce.authdemo.dto.InvoiceResponse;
 import com.ecommerce.authdemo.entity.Invoice;
 import com.ecommerce.authdemo.entity.Order;
 import com.ecommerce.authdemo.entity.OrderItem;
+import com.ecommerce.authdemo.entity.Category;
 import com.ecommerce.authdemo.entity.Product;
 import com.ecommerce.authdemo.entity.ProductVariant;
 import com.ecommerce.authdemo.entity.Seller;
+import com.ecommerce.authdemo.entity.SubCategory;
 import com.ecommerce.authdemo.exception.OrderException;
 import com.ecommerce.authdemo.exception.ResourceNotFoundException;
+import com.ecommerce.authdemo.repository.CategoryRepository;
 import com.ecommerce.authdemo.repository.InvoiceRepository;
 import com.ecommerce.authdemo.repository.OrderItemRepository;
 import com.ecommerce.authdemo.repository.OrderRepository;
 import com.ecommerce.authdemo.repository.ProductRepository;
 import com.ecommerce.authdemo.repository.ProductVariantRepository;
 import com.ecommerce.authdemo.repository.SellerRepository;
+import com.ecommerce.authdemo.repository.SubCategoryRepository;
 import com.ecommerce.authdemo.service.InvoiceService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -30,16 +36,24 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.Year;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 public class InvoiceServiceImpl implements InvoiceService {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final Pattern SELLER_ID_IN_PATH = Pattern.compile("_seller_(\\d+)\\.html$");
+    private static final Pattern GSTIN_STATE_CODE_PATTERN = Pattern.compile("^(\\d{2})");
+    private static final Pattern STATE_CODE_PATTERN = Pattern.compile("(\\d{2})");
 
     private final InvoiceRepository invoiceRepository;
     private final OrderRepository orderRepository;
@@ -47,6 +61,8 @@ public class InvoiceServiceImpl implements InvoiceService {
     private final SellerRepository sellerRepository;
     private final ProductRepository productRepository;
     private final ProductVariantRepository productVariantRepository;
+    private final SubCategoryRepository subCategoryRepository;
+    private final CategoryRepository categoryRepository;
 
     @Value("${invoice.seller.name:Flint & Thread (India) Pvt. Ltd.}")
     private String sellerName;
@@ -66,20 +82,27 @@ public class InvoiceServiceImpl implements InvoiceService {
     @Override
     @Transactional
     public InvoiceResponse create(InvoiceRequest request) {
-        Invoice entity = Invoice.builder()
-                .orderId(request.getOrderId())
-                .invoiceNumber(generateTemporaryInvoiceNumber())
-                .invoicePath(normalize(request.getInvoicePath()))
-                .build();
-
-        Invoice saved = invoiceRepository.save(entity);
-        String generatedInvoiceNumber = generateInvoiceNumber(saved.getId());
-        saved.setInvoiceNumber(generatedInvoiceNumber);
-        if (saved.getInvoicePath() == null) {
-            saved.setInvoicePath(generateInvoiceHtmlFile(generatedInvoiceNumber, saved.getOrderId()));
+        List<Long> sellerIds = resolveSellerIdsForOrder(request.getOrderId());
+        if (sellerIds.isEmpty()) {
+            sellerIds = List.of();
         }
 
-        return toResponse(invoiceRepository.save(saved));
+        Invoice firstSaved = null;
+        if (sellerIds.isEmpty()) {
+            firstSaved = createInvoiceRecord(request.getOrderId(), normalize(request.getInvoicePath()), null);
+        } else {
+            for (Long sellerId : sellerIds) {
+                Invoice saved = createInvoiceRecord(request.getOrderId(), normalize(request.getInvoicePath()), sellerId);
+                if (firstSaved == null) {
+                    firstSaved = saved;
+                }
+            }
+        }
+
+        if (firstSaved == null) {
+            throw new OrderException("Could not create invoice");
+        }
+        return toResponse(firstSaved);
     }
 
     @Override
@@ -142,14 +165,20 @@ public class InvoiceServiceImpl implements InvoiceService {
         return String.format("INV-%d-%06d", year, id);
     }
 
-    private String defaultInvoicePath(String invoiceNumber) {
+    private String defaultInvoicePath(String invoiceNumber, Long sellerId) {
+        if (sellerId != null) {
+            return "invoices/Invoice_" + invoiceNumber + "_seller_" + sellerId + ".html";
+        }
         return "invoices/Invoice_" + invoiceNumber + ".html";
     }
 
-    private String generateInvoiceHtmlFile(String invoiceNumber, Integer orderId) {
-        String relativePath = defaultInvoicePath(invoiceNumber);
+    private String generateInvoiceHtmlFile(String invoiceNumber, Integer orderId, Long sellerId) {
+        String relativePath = defaultInvoicePath(invoiceNumber, sellerId);
         Path invoiceDirectory = invoiceStorageDirectory();
-        Path filePath = invoiceDirectory.resolve("Invoice_" + invoiceNumber + ".html");
+        String fileName = sellerId == null
+                ? "Invoice_" + invoiceNumber + ".html"
+                : "Invoice_" + invoiceNumber + "_seller_" + sellerId + ".html";
+        Path filePath = invoiceDirectory.resolve(fileName);
         Order order = orderId == null
                 ? null
                 : orderRepository.findById(Long.valueOf(orderId)).orElse(null);
@@ -160,19 +189,44 @@ public class InvoiceServiceImpl implements InvoiceService {
         String customerAddress = buildAddress(order);
         String invoiceDate = formatDateTime(LocalDateTime.now());
         String orderDate = formatDateTime(order == null ? null : order.getCreatedAt());
-        String totalAmount = formatAmount(order == null ? null : order.getTotalAmount());
-        SellerSnapshot seller = resolveSellerDetails(orderId);
-        List<InvoiceLineItem> lineItems = resolveInvoiceLineItems(orderId);
+        SellerSnapshot seller = resolveSellerDetails(orderId, sellerId);
+        List<InvoiceLineItem> lineItems = resolveInvoiceLineItems(orderId, sellerId);
+        double totalAmountDouble = lineItems.stream()
+                .mapToDouble(i -> i.lineTotal() * i.quantity())
+                .sum();
+        String totalAmount = formatAmount(totalAmountDouble);
         String itemRowsHtml = buildInvoiceItemRowsHtml(lineItems);
-        String subtotalBeforeTax = formatAmount(lineItems.stream().mapToDouble(InvoiceLineItem::lineTotal).sum());
-        String totalTaxAmount = formatAmount(lineItems.stream().mapToDouble(InvoiceLineItem::taxAmount).sum());
+        String subtotalBeforeTax = formatAmount(lineItems.stream()
+                .mapToDouble(i -> i.unitPrice() * i.quantity())
+                .sum());
+        String totalTaxAmount = formatAmount(lineItems.stream()
+                .mapToDouble(i -> i.taxAmount() * i.quantity())
+                .sum());
         String shippingCharge = formatAmount(order == null ? null : order.getShippingAmount());
-        double orderTaxAmount = order != null && order.getTaxAmount() != null ? order.getTaxAmount() : 0.0d;
+        double orderTaxAmount = lineItems.stream()
+                .mapToDouble(i -> i.taxAmount() * i.quantity())
+                .sum();
         String gstRate = "0.00";
-        double taxableBase = lineItems.stream().mapToDouble(i -> i.unitPrice() * i.quantity()).sum();
+        double gstRatePercent = 0.0d;
+        double taxableBase = lineItems.stream()
+                .mapToDouble(i -> i.unitPrice() * i.quantity())
+                .sum();
         if (taxableBase > 0 && orderTaxAmount > 0) {
-            gstRate = formatAmount((orderTaxAmount * 100.0) / taxableBase);
+            gstRatePercent = (orderTaxAmount * 100.0) / taxableBase;
+            gstRate = formatAmount(gstRatePercent);
         }
+
+        boolean interStateTransaction = order != null && seller != null
+                && isInterStateTransaction(order, seller);
+
+        double totalGstAmount = orderTaxAmount;
+        double cgstAmount = interStateTransaction ? 0.0d : totalGstAmount / 2.0d;
+        // keep total exact even after rounding
+        double sgstAmount = interStateTransaction ? 0.0d : totalGstAmount - cgstAmount;
+        double igstAmount = interStateTransaction ? totalGstAmount : 0.0d;
+        String gstBreakdownNote = interStateTransaction
+                ? "*inter-state transaction - IGST applicable"
+                : "*intra-state transaction - CGST and SGST applicable";
 
         String html = """
                 <!doctype html>
@@ -271,8 +325,12 @@ public class InvoiceServiceImpl implements InvoiceService {
                       </div>
                       <div class="total">
                         <p><strong>Subtotal (Before Tax):</strong> Rs %s</p>
-                        <p><strong>Total Tax:</strong> Rs %s</p>
-                        <p><strong>IGST @ %s%%:</strong> Rs %s</p>
+                        <p class="subheading">GST Breakdown Summary</p>
+                        <p><strong>Total GST:</strong> Rs %s</p>
+                        <p><strong>Total CGST:</strong> Rs %s</p>
+                        <p><strong>Total SGST:</strong> Rs %s</p>
+                        <p><strong>Total IGST:</strong> Rs %s</p>
+                        <p class="muted">%s</p>
                         <p><strong>Shipping Charges:</strong> Rs %s</p>
                         <p><strong>Grand Total:</strong></p>
                         <p class="grand">Rs %s</p>
@@ -308,8 +366,10 @@ public class InvoiceServiceImpl implements InvoiceService {
                 escapeHtml(customerEmail),
                 escapeHtml(subtotalBeforeTax),
                 escapeHtml(totalTaxAmount),
-                escapeHtml(gstRate),
-                escapeHtml(formatAmount(orderTaxAmount)),
+                escapeHtml(formatAmount(cgstAmount)),
+                escapeHtml(formatAmount(sgstAmount)),
+                escapeHtml(formatAmount(igstAmount)),
+                escapeHtml(gstBreakdownNote),
                 escapeHtml(shippingCharge),
                 escapeHtml(totalAmount)
         );
@@ -367,12 +427,17 @@ public class InvoiceServiceImpl implements InvoiceService {
         return normalized == null ? defaultValue : normalized;
     }
 
-    private List<InvoiceLineItem> resolveInvoiceLineItems(Integer orderId) {
+    private List<InvoiceLineItem> resolveInvoiceLineItems(Integer orderId, Long sellerId) {
         if (orderId == null) {
             return List.of();
         }
 
         List<OrderItem> orderItems = orderItemRepository.findByOrderId(Long.valueOf(orderId));
+        if (sellerId != null) {
+            orderItems = orderItems.stream()
+                    .filter(item -> Objects.equals(item.getSellerId(), sellerId))
+                    .toList();
+        }
         if (orderItems == null || orderItems.isEmpty()) {
             return List.of();
         }
@@ -385,6 +450,23 @@ public class InvoiceServiceImpl implements InvoiceService {
         Map<Long, Product> productById = productRepository.findAllById(productIds).stream()
                 .collect(java.util.stream.Collectors.toMap(Product::getId, Function.identity()));
 
+        List<Long> subcategoryIds = productById.values().stream()
+                .map(Product::getSubcategoryId)
+                .filter(Objects::nonNull)
+                .map(Integer::longValue)
+                .distinct()
+                .toList();
+        Map<Long, SubCategory> subcategoryById = subCategoryRepository.findAllById(subcategoryIds).stream()
+                .collect(java.util.stream.Collectors.toMap(SubCategory::getId, Function.identity()));
+
+        List<Long> categoryIds = subcategoryById.values().stream()
+                .map(SubCategory::getCategoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        Map<Long, Category> categoryById = categoryRepository.findAllById(categoryIds).stream()
+                .collect(java.util.stream.Collectors.toMap(Category::getId, Function.identity()));
+
         List<Long> variantIds = orderItems.stream()
                 .map(OrderItem::getVariantId)
                 .filter(Objects::nonNull)
@@ -394,37 +476,192 @@ public class InvoiceServiceImpl implements InvoiceService {
                 .collect(java.util.stream.Collectors.toMap(ProductVariant::getId, Function.identity()));
 
         return orderItems.stream()
-                .map(item -> toInvoiceLineItem(item, productById.get(item.getProductId()), variantById.get(item.getVariantId())))
+                .map(item -> toInvoiceLineItem(
+                        item,
+                        productById.get(item.getProductId()),
+                        variantById.get(item.getVariantId()),
+                        subcategoryById,
+                        categoryById))
                 .toList();
     }
 
-    private InvoiceLineItem toInvoiceLineItem(OrderItem item, Product product, ProductVariant variant) {
+    private InvoiceLineItem toInvoiceLineItem(
+            OrderItem item,
+            Product product,
+            ProductVariant variant,
+            Map<Long, SubCategory> subcategoryById,
+            Map<Long, Category> categoryById) {
         String productName = valueOrDefault(product == null ? null : product.getName(), "Product " + item.getProductId());
         String color = normalize(variant == null ? null : variant.getColor());
         String size = normalize(variant == null ? null : variant.getSize());
         String description = color == null && size == null
                 ? "-"
                 : ("Color: " + valueOrDefault(color, "N/A") + ", Size: " + valueOrDefault(size, "N/A"));
-        String hsnCode = valueOrDefault(variant == null ? null : variant.getSku(), valueOrDefault(product == null ? null : product.getSku(), "-"));
+        TaxProfile taxProfile = resolveTaxProfile(product, subcategoryById, categoryById);
+        String hsnCode = valueOrDefault(
+                taxProfile.hsnCode(),
+                valueOrDefault(variant == null ? null : variant.getSku(), valueOrDefault(product == null ? null : product.getSku(), "-")));
         int quantity = item.getQuantity() == null ? 0 : item.getQuantity();
         double lineTotal = item.getTotal() == null ? 0.0d : item.getTotal();
-        double unitPrice = quantity > 0 ? lineTotal / quantity : (item.getPrice() == null ? 0.0d : item.getPrice());
 
-        double taxPercent = product != null && product.getGstPercentage() != null
-                ? product.getGstPercentage().doubleValue()
-                : resolveTaxPercentFromVariant(variant);
-        double taxableValue = unitPrice * quantity;
-        double taxAmount = taxPercent > 0 ? (taxableValue * taxPercent / 100.0d) : 0.0d;
+        double taxPercent = taxProfile.taxPercent() != null
+                ? taxProfile.taxPercent()
+                : resolveTaxPercentFromVariant(variant, product);
+        /*
+         * Business rule:
+         * - Order item total is treated as tax-inclusive.
+         * - Unit price column should display pre-tax line amount.
+         * - Tax is applied once on the complete line total (e.g., qty=2 same product -> one tax amount).
+         */
+        double unitTotal = quantity > 0 ? (lineTotal / quantity) : lineTotal;
+        double preTaxUnitAmount = unitTotal;
+        double taxAmountPerUnit = 0.0d;
+        if (taxPercent > 0) {
+            preTaxUnitAmount = unitTotal * 100.0d / (100.0d + taxPercent);
+            taxAmountPerUnit = unitTotal - preTaxUnitAmount;
+        }
 
-        return new InvoiceLineItem(productName, description, hsnCode, quantity, unitPrice, taxPercent, taxAmount, lineTotal);
+        return new InvoiceLineItem(
+                productName,
+                description,
+                hsnCode,
+                quantity,
+                preTaxUnitAmount,
+                taxPercent,
+                taxAmountPerUnit,
+                unitTotal
+        );
     }
 
-    private double resolveTaxPercentFromVariant(ProductVariant variant) {
-        if (variant == null || variant.getTaxPercentage() == null) {
-            return 0.0d;
+    private double resolveTaxPercentFromVariant(ProductVariant variant, Product product) {
+        if (variant != null && variant.getTaxPercentage() != null) {
+            return variant.getTaxPercentage().doubleValue();
         }
-        BigDecimal percentage = variant.getTaxPercentage();
-        return percentage.doubleValue();
+        if (product != null && product.getGstPercentage() != null) {
+            return product.getGstPercentage().doubleValue();
+        }
+        return 0.0d;
+    }
+
+    private TaxProfile resolveTaxProfile(
+            Product product,
+            Map<Long, SubCategory> subcategoryById,
+            Map<Long, Category> categoryById) {
+        if (product == null || product.getSubcategoryId() == null) {
+            return new TaxProfile(null, null);
+        }
+
+        SubCategory subCategory = subcategoryById.get(product.getSubcategoryId().longValue());
+        if (subCategory == null) {
+            return new TaxProfile(null, null);
+        }
+
+        TaxProfile materialSlabTax = resolveTaxFromMaterialSlabs(subCategory.getMaterialSlabs());
+        String hsnCode = materialSlabTax.hsnCode();
+        Double gstPercent = materialSlabTax.taxPercent() != null
+                ? materialSlabTax.taxPercent()
+                : (subCategory.getGstPercentage() == null ? null : subCategory.getGstPercentage().doubleValue());
+
+        if (subCategory.getCategoryId() != null) {
+            Category category = categoryById.get(subCategory.getCategoryId());
+            if (category != null) {
+                if (hsnCode == null) {
+                    hsnCode = normalize(category.getHsnCode());
+                }
+            }
+            if (gstPercent == null && category != null) {
+                gstPercent = category.getGstPercentage();
+            }
+        }
+
+        return new TaxProfile(hsnCode, gstPercent);
+    }
+
+    private TaxProfile resolveTaxFromMaterialSlabs(String materialSlabsRaw) {
+        String normalized = normalize(materialSlabsRaw);
+        if (normalized == null) {
+            return new TaxProfile(null, null);
+        }
+
+        try {
+            JsonNode root = OBJECT_MAPPER.readTree(normalized);
+            String hsnCode = findTextByKeys(root, "hsnCode", "hsn_code", "hsn");
+            Double taxPercent = findNumberByKeys(root, "gstPercentage", "gst_percentage", "taxPercentage", "tax_percentage", "gst", "tax");
+            return new TaxProfile(normalize(hsnCode), taxPercent);
+        } catch (Exception ignored) {
+            return new TaxProfile(null, null);
+        }
+    }
+
+    private String findTextByKeys(JsonNode node, String... keys) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (node.isObject()) {
+            for (String key : keys) {
+                JsonNode direct = node.get(key);
+                if (direct != null && !direct.isNull() && direct.isValueNode()) {
+                    String value = normalize(direct.asText());
+                    if (value != null) {
+                        return value;
+                    }
+                }
+            }
+            java.util.Iterator<JsonNode> iterator = node.elements();
+            while (iterator.hasNext()) {
+                String value = findTextByKeys(iterator.next(), keys);
+                if (value != null) {
+                    return value;
+                }
+            }
+        } else if (node.isArray()) {
+            for (JsonNode child : node) {
+                String value = findTextByKeys(child, keys);
+                if (value != null) {
+                    return value;
+                }
+            }
+        }
+        return null;
+    }
+
+    private Double findNumberByKeys(JsonNode node, String... keys) {
+        if (node == null || node.isNull()) {
+            return null;
+        }
+        if (node.isObject()) {
+            for (String key : keys) {
+                JsonNode direct = node.get(key);
+                if (direct != null && !direct.isNull() && direct.isValueNode()) {
+                    if (direct.isNumber()) {
+                        return direct.asDouble();
+                    }
+                    String raw = normalize(direct.asText());
+                    if (raw != null) {
+                        try {
+                            return Double.parseDouble(raw);
+                        } catch (NumberFormatException ignored) {
+                            // continue searching nested nodes
+                        }
+                    }
+                }
+            }
+            java.util.Iterator<JsonNode> iterator = node.elements();
+            while (iterator.hasNext()) {
+                Double value = findNumberByKeys(iterator.next(), keys);
+                if (value != null) {
+                    return value;
+                }
+            }
+        } else if (node.isArray()) {
+            for (JsonNode child : node) {
+                Double value = findNumberByKeys(child, keys);
+                if (value != null) {
+                    return value;
+                }
+            }
+        }
+        return null;
     }
 
     private String buildInvoiceItemRowsHtml(List<InvoiceLineItem> lineItems) {
@@ -462,7 +699,7 @@ public class InvoiceServiceImpl implements InvoiceService {
         return rows.toString();
     }
 
-    private SellerSnapshot resolveSellerDetails(Integer orderId) {
+    private SellerSnapshot resolveSellerDetails(Integer orderId, Long targetSellerId) {
         if (orderId == null) {
             return defaultSellerSnapshot();
         }
@@ -472,11 +709,13 @@ public class InvoiceServiceImpl implements InvoiceService {
             return defaultSellerSnapshot();
         }
 
-        Long sellerId = orderItems.stream()
-                .map(OrderItem::getSellerId)
-                .filter(id -> id != null && id > 0)
-                .findFirst()
-                .orElse(null);
+        Long sellerId = targetSellerId != null
+                ? targetSellerId
+                : orderItems.stream()
+                        .map(OrderItem::getSellerId)
+                        .filter(id -> id != null && id > 0)
+                        .findFirst()
+                        .orElse(null);
 
         if (sellerId == null) {
             return defaultSellerSnapshot();
@@ -507,6 +746,41 @@ public class InvoiceServiceImpl implements InvoiceService {
 
     private SellerSnapshot defaultSellerSnapshot() {
         return new SellerSnapshot(sellerName, sellerAddress, sellerPhone, sellerEmail, sellerGstin);
+    }
+
+    private boolean isInterStateTransaction(Order order, SellerSnapshot seller) {
+        String shippingStateCode = extractFirstStateCode(order.getShippingState());
+        String sellerStateCode = extractStateCodeFromGstin(seller.gstin());
+
+        // If we can't determine, default to intra-state so invoice doesn't suddenly show IGST.
+        if (shippingStateCode == null || sellerStateCode == null) {
+            return true;
+        }
+        return !shippingStateCode.equals(sellerStateCode);
+    }
+
+    private String extractStateCodeFromGstin(String gstin) {
+        String normalized = normalize(gstin);
+        if (normalized == null) {
+            return null;
+        }
+        Matcher m = GSTIN_STATE_CODE_PATTERN.matcher(normalized);
+        if (m.find()) {
+            return m.group(1);
+        }
+        return null;
+    }
+
+    private String extractFirstStateCode(String shippingState) {
+        String normalized = normalize(shippingState);
+        if (normalized == null) {
+            return null;
+        }
+        Matcher m = STATE_CODE_PATTERN.matcher(normalized);
+        if (m.find()) {
+            return m.group(1);
+        }
+        return null;
     }
 
     private String escapeHtml(String value) {
@@ -542,6 +816,12 @@ public class InvoiceServiceImpl implements InvoiceService {
     ) {
     }
 
+    private record TaxProfile(
+            String hsnCode,
+            Double taxPercent
+    ) {
+    }
+
     private Path invoiceStorageDirectory() {
         return Path.of(System.getProperty("user.dir"), "invoices");
     }
@@ -552,8 +832,12 @@ public class InvoiceServiceImpl implements InvoiceService {
             return entity;
         }
 
-        String expectedRelativePath = defaultInvoicePath(invoiceNumber);
-        Path expectedFile = invoiceStorageDirectory().resolve("Invoice_" + invoiceNumber + ".html");
+        Long sellerId = resolveSellerIdFromInvoicePath(entity.getInvoicePath());
+        String expectedRelativePath = defaultInvoicePath(invoiceNumber, sellerId);
+        String expectedFileName = sellerId == null
+                ? "Invoice_" + invoiceNumber + ".html"
+                : "Invoice_" + invoiceNumber + "_seller_" + sellerId + ".html";
+        Path expectedFile = invoiceStorageDirectory().resolve(expectedFileName);
         if (Files.exists(expectedFile)) {
             if (!expectedRelativePath.equals(entity.getInvoicePath())) {
                 entity.setInvoicePath(expectedRelativePath);
@@ -562,11 +846,55 @@ public class InvoiceServiceImpl implements InvoiceService {
             return entity;
         }
 
-        String generatedPath = generateInvoiceHtmlFile(invoiceNumber, entity.getOrderId());
+        String generatedPath = generateInvoiceHtmlFile(invoiceNumber, entity.getOrderId(), sellerId);
         if (!generatedPath.equals(entity.getInvoicePath())) {
             entity.setInvoicePath(generatedPath);
             return invoiceRepository.save(entity);
         }
         return entity;
+    }
+
+    private Invoice createInvoiceRecord(Integer orderId, String explicitPath, Long sellerId) {
+        Invoice entity = Invoice.builder()
+                .orderId(orderId)
+                .invoiceNumber(generateTemporaryInvoiceNumber())
+                .invoicePath(explicitPath)
+                .build();
+
+        Invoice saved = invoiceRepository.save(entity);
+        String generatedInvoiceNumber = generateInvoiceNumber(saved.getId());
+        saved.setInvoiceNumber(generatedInvoiceNumber);
+        if (saved.getInvoicePath() == null) {
+            saved.setInvoicePath(generateInvoiceHtmlFile(generatedInvoiceNumber, saved.getOrderId(), sellerId));
+        }
+        return invoiceRepository.save(saved);
+    }
+
+    private List<Long> resolveSellerIdsForOrder(Integer orderId) {
+        if (orderId == null) {
+            return List.of();
+        }
+        return orderItemRepository.findByOrderId(Long.valueOf(orderId)).stream()
+                .map(OrderItem::getSellerId)
+                .filter(id -> id != null && id > 0)
+                .distinct()
+                .sorted(Comparator.naturalOrder())
+                .toList();
+    }
+
+    private Long resolveSellerIdFromInvoicePath(String invoicePath) {
+        String path = normalize(invoicePath);
+        if (path == null) {
+            return null;
+        }
+        Matcher matcher = SELLER_ID_IN_PATH.matcher(path);
+        if (!matcher.find()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(matcher.group(1));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 }

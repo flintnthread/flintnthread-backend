@@ -22,4 +22,10 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     Optional<Order> findTopByPaymentStatusOrderByCreatedAtDesc(String status);
 
     Optional<Order> findTopByUserIdAndPaymentStatusOrderByCreatedAtDesc(Long userId, String paymentStatus);
+
+    long countByUserId(Long userId);
+
+    long countByUserIdAndPaymentStatus(Long userId, String paymentStatus);
+
+    long countByUserIdAndDiscountAmountGreaterThan(Long userId, Double minDiscountAmount);
 }
