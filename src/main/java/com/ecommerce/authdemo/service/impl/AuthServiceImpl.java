@@ -1,31 +1,38 @@
 package com.ecommerce.authdemo.service.impl;
 
+import com.ecommerce.authdemo.dto.AuthResponseDTO;
 import com.ecommerce.authdemo.dto.Enum.Role;
 import com.ecommerce.authdemo.dto.LoginRequestDTO;
 import com.ecommerce.authdemo.dto.VerifyOtpDTO;
-import com.ecommerce.authdemo.dto.AuthResponseDTO;
-import com.ecommerce.authdemo.entity.Otp;
-import com.ecommerce.authdemo.entity.User;
-import com.ecommerce.authdemo.entity.Seller;
 import com.ecommerce.authdemo.entity.AdminUser;
-import com.ecommerce.authdemo.exception.*;
-import com.ecommerce.authdemo.repository.OtpRepository;
-import com.ecommerce.authdemo.repository.UserRepository;
-import com.ecommerce.authdemo.repository.SellerRepository;
+import com.ecommerce.authdemo.entity.Otp;
+import com.ecommerce.authdemo.entity.Seller;
+import com.ecommerce.authdemo.entity.User;
+import com.ecommerce.authdemo.exception.EmailSendException;
+import com.ecommerce.authdemo.exception.InvalidIdentifierException;
+import com.ecommerce.authdemo.exception.InvalidMobileException;
+import com.ecommerce.authdemo.exception.OtpExpiredException;
+import com.ecommerce.authdemo.exception.OtpNotFoundException;
+import com.ecommerce.authdemo.exception.TooManyAttemptsException;
+import com.ecommerce.authdemo.exception.TooManyRequestsException;
 import com.ecommerce.authdemo.repository.AdminUserRepository;
+import com.ecommerce.authdemo.repository.OtpRepository;
+import com.ecommerce.authdemo.repository.SellerRepository;
+import com.ecommerce.authdemo.repository.UserRepository;
 import com.ecommerce.authdemo.security.JwtUtil;
 import com.ecommerce.authdemo.service.AuthService;
 import com.ecommerce.authdemo.service.EmailService;
 import com.ecommerce.authdemo.service.SmsService;
 import com.ecommerce.authdemo.util.OtpUtil;
 
+import lombok.RequiredArgsConstructor;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import org.springframework.mail.MailException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -34,7 +41,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
-    private static final Logger log = LoggerFactory.getLogger(AuthServiceImpl.class);
+    private static final Logger log =
+            LoggerFactory.getLogger(AuthServiceImpl.class);
 
     private final UserRepository userRepository;
     private final SellerRepository sellerRepository;
@@ -45,154 +53,230 @@ public class AuthServiceImpl implements AuthService {
     private final SmsService smsService;
     private final EmailService emailService;
 
-    // 🔥 SEND OTP
+    /* ======================================================
+       SEND OTP
+    ====================================================== */
+
     @Override
     @Transactional
     public String sendOtp(LoginRequestDTO dto) {
 
         String identifier;
 
-        if (dto.getEmail() != null && !dto.getEmail().isEmpty()) {
-            identifier = dto.getEmail();
-        } else if (dto.getMobile() != null && !dto.getMobile().isEmpty()) {
+        if (dto.getEmail() != null && !dto.getEmail().trim().isEmpty()) {
+            identifier = dto.getEmail().trim().toLowerCase();
+
+        } else if (dto.getMobile() != null &&
+                !dto.getMobile().trim().isEmpty()) {
 
             if (!dto.getMobile().matches("^[6-9]\\d{9}$")) {
                 throw new InvalidMobileException("Invalid mobile number");
             }
 
-            identifier = dto.getMobile();
+            identifier = dto.getMobile().trim();
+
         } else {
-            throw new InvalidIdentifierException("Email or Mobile is required");
+            throw new InvalidIdentifierException(
+                    "Email or Mobile is required");
         }
 
-        Optional<Otp> existingOtp =
-                otpRepository.findTopByIdentifierOrderByExpiryTimeDesc(identifier);
+        Optional<Otp> oldOtp =
+                otpRepository.findTopByIdentifierOrderByExpiryTimeDesc(
+                        identifier);
 
-        if (existingOtp.isPresent() &&
-                existingOtp.get().getExpiryTime().minusMinutes(4).isAfter(LocalDateTime.now())) {
-            throw new TooManyRequestsException("Please wait before requesting another OTP");
+        if (oldOtp.isPresent() &&
+                oldOtp.get()
+                        .getExpiryTime()
+                        .minusMinutes(4)
+                        .isAfter(LocalDateTime.now())) {
+
+            throw new TooManyRequestsException(
+                    "Please wait before requesting another OTP");
         }
 
         String otp = otpUtil.generateOtp();
 
         otpRepository.deleteByIdentifier(identifier);
 
-        Otp otpEntity = new Otp();
-        otpEntity.setIdentifier(identifier);
-        otpEntity.setOtp(otp);
-        otpEntity.setExpiryTime(LocalDateTime.now().plusMinutes(5));
-        otpEntity.setAttempts(0);
-        otpRepository.save(otpEntity);
+        Otp entity = new Otp();
+        entity.setIdentifier(identifier);
+        entity.setOtp(otp);
+        entity.setAttempts(0);
+        entity.setExpiryTime(LocalDateTime.now().plusMinutes(5));
+
+        otpRepository.saveAndFlush(entity);
 
         if (identifier.contains("@")) {
+
             try {
-                log.info("Sending OTP {} to email {}", otp, identifier);
                 emailService.sendOtpEmail(identifier, otp);
+
             } catch (MailException e) {
-                throw new EmailSendException("Unable to send OTP to email");
+                throw new EmailSendException(
+                        "Unable to send OTP to email");
             }
+
         } else {
-            String message = "<#> Your FlintnThread OTP is " + otp;
-            smsService.sendSms("+91" + identifier, message);
+
+            smsService.sendSms(
+                    "+91" + identifier,
+                    "<#> Your FlintnThread OTP is " + otp
+            );
         }
 
         return identifier.contains("@") ? "EMAIL" : "SMS";
     }
 
-    // 🔥 VERIFY OTP
+    /* ======================================================
+       VERIFY OTP
+    ====================================================== */
+
     @Override
     @Transactional
     public AuthResponseDTO verifyOtp(VerifyOtpDTO dto) {
 
+        log.info("========== VERIFY OTP START ==========");
+
         String identifier;
 
-        if (dto.getEmail() != null && !dto.getEmail().isEmpty()) {
-            identifier = dto.getEmail();
-        } else if (dto.getMobile() != null && !dto.getMobile().isEmpty()) {
-            identifier = dto.getMobile();
+        if (dto.getEmail() != null &&
+                !dto.getEmail().trim().isEmpty()) {
+
+            identifier = dto.getEmail()
+                    .trim()
+                    .toLowerCase();
+
+        } else if (dto.getMobile() != null &&
+                !dto.getMobile().trim().isEmpty()) {
+
+            identifier = dto.getMobile().trim();
+
         } else {
-            throw new RuntimeException("Email or Mobile required");
+            throw new RuntimeException(
+                    "Email or Mobile required");
         }
 
-        Optional<Otp> otpOptional =
-                otpRepository.findTopByIdentifierOrderByExpiryTimeDesc(identifier);
+        log.info("Identifier: {}", identifier);
 
-        if (otpOptional.isEmpty()) {
-            throw new OtpNotFoundException("OTP not found or expired");
-        }
+        Otp otpEntity =
+                otpRepository
+                        .findTopByIdentifierOrderByExpiryTimeDesc(
+                                identifier)
+                        .orElseThrow(() ->
+                                new OtpNotFoundException(
+                                        "OTP not found"));
 
-        Otp otpEntity = otpOptional.get();
+        log.info("OTP row found");
 
         if (otpEntity.getAttempts() >= 5) {
-            throw new TooManyAttemptsException("Too many attempts. Try again later.");
+            throw new TooManyAttemptsException(
+                    "Too many attempts. Try again later.");
         }
 
-        if (otpEntity.getExpiryTime().isBefore(LocalDateTime.now())) {
-            throw new OtpExpiredException("OTP expired");
+        if (otpEntity.getExpiryTime()
+                .isBefore(LocalDateTime.now())) {
+
+            throw new OtpExpiredException(
+                    "OTP expired");
         }
 
-        // ✅ SAFE OTP VALIDATION
-        if (dto.getOtp() == null) {
-            throw new RuntimeException("OTP is required");
+        String enteredOtp =
+                String.valueOf(dto.getOtp()).trim();
+
+        String savedOtp =
+                String.valueOf(otpEntity.getOtp()).trim();
+
+        log.info("Saved OTP: {}", savedOtp);
+        log.info("Entered OTP: {}", enteredOtp);
+
+        if (!savedOtp.equals(enteredOtp)) {
+
+            otpEntity.setAttempts(
+                    otpEntity.getAttempts() + 1
+            );
+
+            otpRepository.saveAndFlush(otpEntity);
+
+            throw new RuntimeException(
+                    "Invalid OTP");
         }
 
-        if (!otpEntity.getOtp().equals(String.valueOf(dto.getOtp()))) {
+        log.info("OTP matched");
 
-            otpEntity.setAttempts(otpEntity.getAttempts() + 1);
-            otpRepository.save(otpEntity);
+        Role role = Role.USER;
 
-            throw new RuntimeException("Invalid OTP");
-        }
+        if (adminUserRepository
+                .findByEmail(identifier)
+                .isPresent()) {
 
-        Role role;
-
-        Optional<AdminUser> admin =
-                adminUserRepository.findByEmail(identifier);
-
-        if (admin.isPresent()) {
             role = Role.ADMIN;
+
+        } else if (
+                sellerRepository
+                        .findByEmail(identifier)
+                        .isPresent()
+
+                        ||
+
+                        sellerRepository
+                                .findByMobileNumber(identifier)
+                                .isPresent()
+        ) {
+
+            role = Role.SELLER;
+
         } else {
 
-            Optional<Seller> seller =
-                    sellerRepository.findByEmail(identifier)
-                            .or(() -> sellerRepository.findByMobileNumber(identifier));
+            Optional<User> user =
+                    userRepository
+                            .findByEmail(identifier)
+                            .or(() ->
+                                    userRepository
+                                            .findByContactNumber(identifier)
+                            );
 
-            if (seller.isPresent()) {
-                role = Role.SELLER;
-            } else {
+            if (user.isEmpty()) {
 
-                Optional<User> user =
-                        userRepository.findByEmail(identifier)
-                                .or(() -> userRepository.findByContactNumber(identifier));
+                log.info("Creating new user");
 
-                if (user.isPresent()) {
-                    role = Role.USER;
+                User newUser = new User();
+
+                if (identifier.contains("@")) {
+
+                    newUser.setEmail(identifier);
+                    newUser.setUsername(identifier);
+
                 } else {
 
-                    User newUser = new User();
-
-                    if (identifier.contains("@")) {
-                        newUser.setEmail(identifier);
-                        newUser.setUsername(identifier);
-                    } else {
-                        newUser.setContactNumber(identifier);
-                        newUser.setUsername(identifier);
-                    }
-
-                    newUser.setVerified(true);
-                    newUser.setRole(Role.USER);
-
-                    userRepository.save(newUser);
-
-                    role = Role.USER;
+                    newUser.setContactNumber(identifier);
+                    newUser.setUsername(identifier);
                 }
+
+                newUser.setVerified(true);
+                newUser.setRole(Role.USER);
+
+                userRepository.saveAndFlush(newUser);
             }
         }
 
+        log.info("Deleting old OTP");
+
         otpRepository.deleteByIdentifier(identifier);
+        otpRepository.flush();
 
-        String token = jwtUtil.generateToken(identifier, role.name());
+        log.info("Generating JWT");
 
-        return new AuthResponseDTO(token, role.name());
+        String token =
+                jwtUtil.generateToken(
+                        identifier,
+                        role.name()
+                );
+
+        log.info("========== VERIFY OTP SUCCESS ==========");
+
+        return new AuthResponseDTO(
+                token,
+                role.name()
+        );
     }
 }
