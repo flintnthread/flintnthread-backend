@@ -61,7 +61,6 @@ public class CartServiceImpl implements CartService {
             Cart cart = existingCart.get();
             int newQuantity = cart.getQuantity() + dto.getQuantity();
             validateQuantity(newQuantity);
-            validateVariantStockLimit(dto.getVariantId(), newQuantity);
             cart.setQuantity(newQuantity);
             cart.setPrice(productPrice);
             cart.setTotalAmount(productPrice.multiply(BigDecimal.valueOf(newQuantity)));
@@ -71,7 +70,6 @@ public class CartServiceImpl implements CartService {
             cartRepository.save(cart);
             log.info("Updated existing cart item: cartId={}, newQuantity={}", cart.getId(), newQuantity);
         } else {
-            validateVariantStockLimit(dto.getVariantId(), dto.getQuantity());
             Cart newCart = createCart(userId, dto.getProductId(), dto.getVariantId(), dto.getQuantity(), productPrice);
             log.info("Created new cart item: cartId={}", newCart.getId());
         }
@@ -103,7 +101,6 @@ public class CartServiceImpl implements CartService {
         int newQuantity = currentQuantity + quantity;
         
         validateQuantity(newQuantity);
-        validateVariantStockLimit(cart.getVariantId(), newQuantity);
         
         BigDecimal productPrice = resolveUnitPriceStrict(cart.getProductId(), cart.getVariantId());
         cart.setQuantity(newQuantity);
@@ -320,22 +317,6 @@ public class CartServiceImpl implements CartService {
         }
         if (quantity > 100) {
             throw new CartException("Maximum quantity allowed is 100");
-        }
-    }
-
-    private void validateVariantStockLimit(Long variantId, Integer newQuantity) {
-        if (variantId == null || newQuantity == null) {
-            return;
-        }
-        // If stock is null, treat as unlimited.
-        ProductVariant variant = productVariantRepository.findByIdWithProduct(variantId)
-                .orElse(null);
-        if (variant == null) {
-            return;
-        }
-        Integer stock = variant.getStock();
-        if (stock != null && stock >= 0 && newQuantity > stock) {
-            throw new CartException("Out of stock");
         }
     }
 
