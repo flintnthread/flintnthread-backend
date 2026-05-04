@@ -45,7 +45,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/auth/send-otp",
                                 "/auth/verify-otp",
-                                "/api/auth/**"
+                                "/api/auth/**",
+                                "/api/referral/**"
                         ).permitAll()
 
 
