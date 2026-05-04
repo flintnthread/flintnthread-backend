@@ -259,7 +259,7 @@ public class AuthServiceImpl implements AuthService {
                 User savedUser = userRepository.saveAndFlush(newUser);
 
                 // ✅ Step 2: Generate referral code
-                ReferralService.generateCodes(
+                referralService.generateCodes(
                         savedUser.getId(),
                         savedUser.getUsername()
                 );
