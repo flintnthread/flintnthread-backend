@@ -143,7 +143,20 @@ public class ReferralServiceImpl implements ReferralService {
     @Override
     public ReferralDashboardDto getDashboard(Long userId) {
 
-        User user = userRepository.findById(userId).orElseThrow();
+        System.out.println(" Dashboard API HIT with userId: " + userId);
+
+        if (userId == null) {
+            throw new RuntimeException("UserId is null");
+        }
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
+        if (user.getReferralCode() == null || user.getReferralCode().isEmpty()) {
+            generateCodes(userId, user.getUsername());
+            user = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found after generation"));
+        }
 
         long invites = getSuccessfulReferrals(userId);
 
