@@ -1,51 +1,70 @@
 package com.ecommerce.authdemo.controller;
 
-import com.ecommerce.authdemo.dto.ApiResponse;
-import com.ecommerce.authdemo.dto.ApplyReferralCodeRequest;
-import com.ecommerce.authdemo.dto.ReferralOverviewDTO;
-import com.ecommerce.authdemo.exception.OrderException;
+import com.ecommerce.authdemo.dto.ApplyReferralRequest;
+import com.ecommerce.authdemo.dto.ReferralDashboardDto;
+import com.ecommerce.authdemo.dto.ReferralResponse;
+import com.ecommerce.authdemo.dto.ShareDto;
 import com.ecommerce.authdemo.service.ReferralService;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+
 @RestController
-@RequestMapping("/api/referrals")
+@RequestMapping("/api/referral")
 @RequiredArgsConstructor
-@Slf4j
 public class ReferralController {
 
     private final ReferralService referralService;
 
-    @GetMapping("/me")
-    public ResponseEntity<ApiResponse<ReferralOverviewDTO>> getMyReferralOverview() {
-        try {
-            ReferralOverviewDTO data = referralService.getMyReferralOverview();
-            return ResponseEntity.ok(new ApiResponse<>(true, "Referral overview fetched", data));
-        } catch (Exception e) {
-            log.error("Failed to fetch referral overview", e);
-            return ResponseEntity.internalServerError()
-                    .body(new ApiResponse<>(false, e.getMessage() != null ? e.getMessage() : "Failed to fetch referral overview", null));
-        }
+    @PostMapping("/apply")
+    public ReferralResponse apply(
+            @RequestBody ApplyReferralRequest request) {
+
+        return referralService.applyReferral(
+                request.getUserId(),
+                request.getReferralCode()
+        );
     }
 
-    @PostMapping("/apply")
-    public ResponseEntity<ApiResponse<ReferralOverviewDTO>> applyReferralCode(
-            @Valid @RequestBody ApplyReferralCodeRequest request
-    ) {
-        try {
-            ReferralOverviewDTO data = referralService.applyReferralCode(request.getReferralCode());
-            return ResponseEntity.ok(new ApiResponse<>(true, "Referral code applied successfully", data));
-        } catch (OrderException e) {
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, e.getMessage(), null));
-        } catch (Exception e) {
-            log.error("Failed to apply referral code", e);
-            return ResponseEntity.internalServerError()
-                    .body(new ApiResponse<>(false, e.getMessage() != null ? e.getMessage() : "Failed to apply referral code", null));
-        }
+    @GetMapping("/discount/{userId}/{subtotal}")
+    public BigDecimal discount(
+            @PathVariable Long userId,
+            @PathVariable BigDecimal subtotal) {
+
+        return referralService.calculateFirstOrderDiscount(
+                userId,
+                subtotal
+        );
+    }
+
+    @GetMapping("/dashboard/{userId}")
+    public ReferralDashboardDto dashboard(
+            @PathVariable Long userId) {
+
+        return referralService.getDashboard(userId);
+    }
+
+    @PostMapping("/refresh/{userId}")
+    public String refreshCode(
+            @PathVariable Long userId) {
+
+        return referralService.refreshReferralCode(userId);
+    }
+
+    @GetMapping("/share/{userId}")
+    public ShareDto share(
+            @PathVariable Long userId) {
+
+        return referralService.getShareData(userId);
+    }
+
+    @PostMapping("/generate/{userId}/{username}")
+    public String generate(
+            @PathVariable Long userId,
+            @PathVariable String username) {
+
+        referralService.generateCodes(userId, username);
+        return "Referral code generated successfully";
     }
 }
-

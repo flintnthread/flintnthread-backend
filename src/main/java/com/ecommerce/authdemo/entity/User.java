@@ -64,6 +64,9 @@ public class User {
         this.updatedAt = LocalDateTime.now();
     }
 
+    @Column(name = "referral_code", unique = true)
+    private String referralCode;
+
     @PreUpdate
     public void onUpdate() {
         this.updatedAt = LocalDateTime.now();
