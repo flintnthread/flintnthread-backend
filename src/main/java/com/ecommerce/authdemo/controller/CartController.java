@@ -67,60 +67,67 @@ public class CartController {
         }
     }
 
-    @PutMapping("/item/{id}")
-    public ResponseEntity<ApiResponse<CartResponseDTO>> updateQuantity(
-            @PathVariable Long id,
-            @RequestParam Integer quantity) {
-        
-        log.info("Update quantity request: itemId={}, quantity={}", id, quantity);
-        
-        if (quantity == null || quantity == 0) {
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, "Quantity cannot be zero", null));
-        }
-        
-        try {
-            CartResponseDTO response = cartService.updateQuantity(id, quantity);
-            return ResponseEntity.ok(
-                    new ApiResponse<>(true, "Quantity updated successfully", response)
-            );
-        } catch (ResourceNotFoundException e) {
-            log.error("Cart item not found: {}", e.getMessage());
-            return ResponseEntity.notFound().build();
-        } catch (CartException e) {
-            log.error("Cart error: {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, e.getMessage(), null));
-        } catch (Exception e) {
-            log.error("Unexpected error updating quantity: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                    .body(new ApiResponse<>(false, "Failed to update quantity", null));
-        }
+   @PutMapping("/item/{id}")
+public ResponseEntity<ApiResponse<CartResponseDTO>> updateQuantity(
+        @PathVariable Long id,
+        @RequestParam Integer quantity) {
+
+    log.info("Update quantity request: itemId={}, quantity={}", id, quantity);
+
+    if (quantity == null || quantity == 0) {
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(false, "Quantity cannot be zero", null));
     }
 
-    @DeleteMapping("/item/{id}")
-    public ResponseEntity<ApiResponse<CartResponseDTO>> removeItem(@PathVariable Long id) {
-        log.info("Remove item request: itemId={}", id);
-        
-        try {
+    try {
+        // Get existing cart item
+        var cartItem = cartService.getCartItemById(id);
+
+        int newQty = cartItem.getQuantity() + quantity;
+
+        // ✅ STOCK VALIDATION - Check before increasing quantity
+        if (quantity > 0) {
+            Integer availableStock = cartService.getStockByVariantId(cartItem.getVariantId());
+            if (availableStock != null && availableStock >= 0 && newQty > availableStock) {
+                return ResponseEntity.badRequest()
+                        .body(new ApiResponse<>(
+                                false,
+                                "Only " + availableStock + " items available in stock",
+                                null
+                        ));
+            }
+        }
+
+        // ✅ REMOVE if qty becomes 0
+        if (newQty <= 0) {
             CartResponseDTO response = cartService.removeItem(id);
             return ResponseEntity.ok(
                     new ApiResponse<>(true, "Item removed successfully", response)
             );
-        } catch (ResourceNotFoundException e) {
-            log.error("Cart item not found: {}", e.getMessage());
-            return ResponseEntity.notFound().build();
-        } catch (CartException e) {
-            log.error("Cart error: {}", e.getMessage());
-            return ResponseEntity.badRequest()
-                    .body(new ApiResponse<>(false, e.getMessage(), null));
-        } catch (Exception e) {
-            log.error("Unexpected error removing item: {}", e.getMessage(), e);
-            return ResponseEntity.internalServerError()
-                    .body(new ApiResponse<>(false, "Failed to remove item", null));
         }
-    }
 
+        // ✅ UPDATE quantity
+        CartResponseDTO response = cartService.updateQuantity(id, quantity);
+
+        return ResponseEntity.ok(
+                new ApiResponse<>(true, "Quantity updated successfully", response)
+        );
+
+    } catch (ResourceNotFoundException e) {
+        log.error("Cart item not found: {}", e.getMessage());
+        return ResponseEntity.notFound().build();
+
+    } catch (CartException e) {
+        log.error("Cart error: {}", e.getMessage());
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(false, e.getMessage(), null));
+
+    } catch (Exception e) {
+        log.error("Unexpected error updating quantity: {}", e.getMessage(), e);
+        return ResponseEntity.internalServerError()
+                .body(new ApiResponse<>(false, "Failed to update quantity", null));
+    }
+}
     @DeleteMapping("/clear")
     public ResponseEntity<ApiResponse<CartResponseDTO>> clearCart() {
         log.info("Clear cart request");

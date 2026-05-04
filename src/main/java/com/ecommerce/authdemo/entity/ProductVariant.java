@@ -23,7 +23,6 @@ public class ProductVariant {
     @JsonIgnore
     private Product product;
 
-
     private String color;
     private String size;
     private String sku;
@@ -57,14 +56,16 @@ public class ProductVariant {
     private LocalDateTime updatedAt;
 
     /**
-     * Unit selling for cart / UI {@code price}: {@link #sellingPrice}, then {@link #finalPrice}, then {@link #basePrice}.
+     * Unit selling for cart / UI price:
+     * sellingPrice → finalPrice → basePrice
      */
     public BigDecimal resolveSellingUnitPrice() {
         return firstPositive(sellingPrice, finalPrice, basePrice);
     }
 
     /**
-     * Unit MRP for UI {@code originalPrice}: {@link #mrpPrice}, then {@link #mrpInclGst}, then {@link #mrpExclGst}.
+     * Unit MRP for UI original price:
+     * mrpPrice → mrpInclGst → mrpExclGst
      */
     public BigDecimal resolveMrpUnitPrice() {
         return firstPositive(mrpPrice, mrpInclGst, mrpExclGst);

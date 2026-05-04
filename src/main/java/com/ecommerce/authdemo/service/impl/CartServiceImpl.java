@@ -90,37 +90,61 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    @Transactional
-    public CartResponseDTO updateQuantity(Long itemId, Integer quantity) {
-        log.info("Updating cart item quantity: itemId={}, quantityToAdd={}", itemId, quantity);
-        
-        Cart cart = cartRepository.findById(itemId)
-                .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
-        
-        validateCartOwnership(cart);
-        
-        int currentQuantity = cart.getQuantity();
-        int newQuantity = currentQuantity + quantity;
-        
-        validateQuantity(newQuantity);
-        validateVariantStockLimit(cart.getVariantId(), newQuantity);
-        
+@Transactional
+public CartResponseDTO updateQuantity(Long itemId, Integer change) {
+
+    log.info("Updating cart item quantity: itemId={}, change={}", itemId, change);
+
+    Cart cart = cartRepository.findById(itemId)
+            .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
+
+    validateCartOwnership(cart);
+
+    int currentQuantity = cart.getQuantity();
+    int newQuantity = currentQuantity + change;
+
+    // ✅ FETCH VARIANT (CORRECT WAY)
+    ProductVariant variant = productVariantRepository.findById(cart.getVariantId())
+            .orElseThrow(() -> new CartException("Variant not found"));
+
+    Integer stock = variant.getStock();
+
+    // ✅ STRICT STOCK CHECK
+    if (stock == null) {
+        throw new CartException("Stock not defined for this variant");
+    }
+
+    if (stock <= 0) {
+        throw new CartException("Stock unavailable");
+    }
+
+    if (newQuantity > stock) {
+        throw new CartException("Only " + stock + " items available in stock");
+    }
+
+    // ✅ HANDLE REMOVE
+    if (newQuantity <= 0) {
+        cartRepository.delete(cart);
+        log.info("Item removed due to zero quantity: itemId={}", itemId);
+    } else {
+
         BigDecimal productPrice = resolveUnitPriceStrict(cart.getProductId(), cart.getVariantId());
+
         cart.setQuantity(newQuantity);
         cart.setPrice(productPrice);
         cart.setTotalAmount(productPrice.multiply(BigDecimal.valueOf(newQuantity)));
+
         BigDecimal discount = cart.getDiscountAmount() != null ? cart.getDiscountAmount() : BigDecimal.ZERO;
         BigDecimal shipping = cart.getShippingAmount() != null ? cart.getShippingAmount() : BigDecimal.ZERO;
+
         cart.setFinalAmount(cart.getTotalAmount().subtract(discount).add(shipping));
+
         cartRepository.save(cart);
-        
-        log.info("Updated cart item quantity: itemId={}, previousQuantity={}, addedQuantity={}, newTotalQuantity={}", 
-                itemId, currentQuantity, quantity, newQuantity);
-        
-        List<Cart> cartItems = cartRepository.findAllByUser_Id(securityUtil.getCurrentUserId());
-        return buildCartResponse(cartItems);
     }
 
+    List<Cart> cartItems = cartRepository.findAllByUser_Id(securityUtil.getCurrentUserId());
+    return buildCartResponse(cartItems);
+}
     @Override
     @Transactional
     public CartResponseDTO removeItem(Long itemId) {
@@ -149,9 +173,32 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
+    public Cart getCartItemById(Long itemId) {
+        return cartRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cart item not found"));
+    }
+
+    @Override
+    public Integer getStockByVariantId(Long variantId) {
+        if (variantId == null) return 0;
+        return productVariantRepository.findById(variantId)
+                .map(ProductVariant::getStock)
+                .orElse(0);
+    }
+
+    @Override
     public Integer getCartCount() {
         Long userId = securityUtil.getCurrentUserId();
-        return cartRepository.findAllByUser_Id(userId).size();
+        List<Cart> cartItems = cartRepository.findAllByUser_Id(userId);
+
+        // Return distinct product count (unique productIds), not total quantity
+        long distinctProductCount = cartItems.stream()
+                .map(Cart::getProductId)
+                .distinct()
+                .count();
+
+        log.info("Cart count for user {}: {} distinct products", userId, distinctProductCount);
+        return (int) distinctProductCount;
     }
 
     @Override
@@ -184,25 +231,54 @@ public class CartServiceImpl implements CartService {
             dto.setProductId(cart.getProductId());
             dto.setVariantId(cart.getVariantId());
 
-            ProductVariant variant = productVariantRepository.findByIdWithProduct(cart.getVariantId()).orElse(null);
-            if (variant != null && variant.getProduct() != null
-                    && !variant.getProduct().getId().equals(cart.getProductId())) {
-                log.warn("Cart line {}: variant {} belongs to product {} but cart has productId {}",
-                        cart.getId(), cart.getVariantId(), variant.getProduct().getId(), cart.getProductId());
-                variant = null;
+            // ✅ DEBUG: Log cart variantId before lookup
+            log.info("[STOCK DEBUG] Cart itemId={}, variantId={}", cart.getId(), cart.getVariantId());
+
+            // ✅ Fetch variant with product to ensure proper loading
+            ProductVariant variant = null;
+            if (cart.getVariantId() != null) {
+                variant = productVariantRepository.findByIdWithProduct(cart.getVariantId()).orElse(null);
+            }
+
+            if (variant != null) {
+                // ✅ Get stock directly from variant
+                Integer stock = variant.getStock();
+
+                // ✅ DEBUG: Log raw stock value from entity
+                log.info("[STOCK DEBUG] variantId={}, rawStockFromDB={}", cart.getVariantId(), stock);
+
+                // Handle null stock as 0
+                int availableStock = (stock != null) ? stock : 0;
+
+                dto.setAvailableStock(availableStock);
+                dto.setOutOfStock(availableStock <= 0);
+
+                log.info("[STOCK SET] itemId={}, variantId={}, availableStock={}, outOfStock={}",
+                        cart.getId(), cart.getVariantId(), availableStock, availableStock <= 0);
+
+            } else {
+                log.warn("[STOCK DEBUG] Variant NOT FOUND for variantId={}", cart.getVariantId());
+                dto.setAvailableStock(0);
+                dto.setOutOfStock(true);
             }
 
             BigDecimal unitSell = resolveSellingForCartLine(variant, cart);
             BigDecimal rawMrp = variant != null ? variant.resolveMrpUnitPrice() : null;
             BigDecimal unitMrp = (rawMrp != null && rawMrp.compareTo(unitSell) > 0) ? rawMrp : unitSell;
 
-            if (variant != null && unitSell.compareTo(BigDecimal.ZERO) > 0) {
+            // ✅ PRICE CORRECTION BLOCK (if variant exists)
+            if (variant != null) {
+                // 🔥 FIX PRICE if wrong
                 BigDecimal stored = cart.getPrice() != null ? cart.getPrice() : BigDecimal.ZERO;
                 if (stored.compareTo(unitSell) != 0) {
                     cart.setPrice(unitSell);
                     cart.setTotalAmount(unitSell.multiply(BigDecimal.valueOf(cart.getQuantity())));
-                    cart.setFinalAmount(cart.getTotalAmount().subtract(cart.getDiscountAmount()).add(cart.getShippingAmount()));
-                    cartsToPersist.add(cart);
+                    cart.setFinalAmount(cart.getTotalAmount()
+                            .subtract(cart.getDiscountAmount())
+                            .add(cart.getShippingAmount()));
+                    if (!cartsToPersist.contains(cart)) {
+                        cartsToPersist.add(cart);
+                    }
                 }
             }
 
@@ -223,9 +299,11 @@ public class CartServiceImpl implements CartService {
             dto.setQuantity(cart.getQuantity());
             dto.setTotal(unitSell.multiply(BigDecimal.valueOf(cart.getQuantity())));
 
+            // ✅ Set size/color from variant (stock already set above)
             if (variant != null) {
                 String sizeLabel = sizeColorMapper.getSizeName(variant.getSize());
                 String colorLabel = sizeColorMapper.getColorName(variant.getColor());
+
                 dto.setSize(sizeLabel);
                 dto.setColor(colorLabel);
                 dto.setColorName(colorLabel);
@@ -258,36 +336,47 @@ public class CartServiceImpl implements CartService {
         summary.setDeliveryCharge(delivery);
         summary.setFinalTotal(finalTotal);
 
+        // Calculate distinct product count (unique productIds)
+        long distinctProductCount = cartItems.stream()
+                .map(Cart::getProductId)
+                .distinct()
+                .count();
+
         CartResponseDTO response = new CartResponseDTO();
         response.setItems(itemDTOs);
         response.setPriceSummary(summary);
         response.setCouponApplied(cartItems.isEmpty() ? null : cartItems.get(0).getCouponCode());
+        response.setProductCount((int) distinctProductCount);
 
         return response;
     }
 
-    private Cart createCart(Long userId, Long productId, Long variantId, Integer quantity, BigDecimal price) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        
-        Cart cart = Cart.builder()
-                .user(user)
-                .sessionId("USER-" + userId)
-                .productId(productId)
-                .variantId(variantId != null ? variantId : 1L)
-                .quantity(quantity != null ? quantity : 1)
-                .price(price != null ? price : BigDecimal.ZERO)
-                .deliveryType(com.ecommerce.authdemo.dto.Enum.DeliveryType.metro_metro)
-                .totalAmount(price != null ? price.multiply(BigDecimal.valueOf(quantity != null ? quantity : 1)) : BigDecimal.ZERO)
-                .discountAmount(BigDecimal.ZERO)
-                .shippingAmount(BigDecimal.ZERO)
-                .finalAmount(price != null ? price.multiply(BigDecimal.valueOf(quantity != null ? quantity : 1)) : BigDecimal.ZERO)
-                .currency("USD")
-                .build();
+   private Cart createCart(Long userId, Long productId, Long variantId, Integer quantity, BigDecimal price) {
 
-        return cartRepository.save(cart);
+    if (variantId == null) {
+        throw new CartException("Variant ID is required");
     }
 
+    User user = userRepository.findById(userId)
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+    Cart cart = Cart.builder()
+            .user(user)
+            .sessionId("USER-" + userId)
+            .productId(productId)
+            .variantId(variantId) // ✅ FIXED (removed default 1L)
+            .quantity(quantity != null ? quantity : 1)
+            .price(price != null ? price : BigDecimal.ZERO)
+            .deliveryType(com.ecommerce.authdemo.dto.Enum.DeliveryType.metro_metro)
+            .totalAmount(price.multiply(BigDecimal.valueOf(quantity)))
+            .discountAmount(BigDecimal.ZERO)
+            .shippingAmount(BigDecimal.ZERO)
+            .finalAmount(price.multiply(BigDecimal.valueOf(quantity)))
+            .currency("USD")
+            .build();
+
+    return cartRepository.save(cart);
+}
     private Cart getCartEntity() {
         Long userId = securityUtil.getCurrentUserId();
         return getOrCreateCart(userId);
@@ -324,20 +413,28 @@ public class CartServiceImpl implements CartService {
     }
 
     private void validateVariantStockLimit(Long variantId, Integer newQuantity) {
-        if (variantId == null || newQuantity == null) {
-            return;
-        }
-        // If stock is null, treat as unlimited.
-        ProductVariant variant = productVariantRepository.findByIdWithProduct(variantId)
-                .orElse(null);
-        if (variant == null) {
-            return;
-        }
-        Integer stock = variant.getStock();
-        if (stock != null && stock >= 0 && newQuantity > stock) {
-            throw new CartException("Out of stock");
-        }
+
+    if (variantId == null) {
+        throw new CartException("Variant ID cannot be null");
     }
+
+    ProductVariant variant = productVariantRepository.findByIdWithProduct(variantId)
+            .orElseThrow(() -> new CartException("Variant not found"));
+
+    Integer stock = variant.getStock();
+
+    if (stock == null) {
+        throw new CartException("Stock not defined");
+    }
+
+    if (stock <= 0) {
+        throw new CartException("Out of stock");
+    }
+
+    if (newQuantity > stock) {
+        throw new CartException("Only " + stock + " items available in stock");
+    }
+}
 
     private void validateCartOwnership(Cart cart) {
         Long currentUserId = securityUtil.getCurrentUserId();
