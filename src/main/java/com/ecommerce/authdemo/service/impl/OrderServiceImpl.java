@@ -66,13 +66,23 @@ public class OrderServiceImpl implements OrderService {
             boolean referralDiscountApplied = false;
             // Apply referral reward on the next order (one-time), regardless of prior orders.
             double referralDiscountPercent = 0.0d;
+
             try {
-                BigDecimal discountPercent = referralService.getAvailableReferralDiscountPercentForUser(userId);
-                referralDiscountPercent = discountPercent != null ? discountPercent.doubleValue() : 0.0d;
+                long paidOrders = orderRepository.countByUserIdAndPaymentStatus(userId, "paid");
+
+                if (paidOrders == 0) {
+                    BigDecimal discountPercent = referralService
+                            .getAvailableReferralDiscountPercentForUser(userId);
+
+                    referralDiscountPercent = (discountPercent != null)
+                            ? discountPercent.doubleValue()
+                            : 0.0d;
+                }
+
             } catch (Exception e) {
                 log.warn("[ORDER] referral discount lookup failed userId={}: {}", userId, e.getMessage());
-                referralDiscountPercent = 0.0d;
             }
+
             if (referralDiscountPercent > 0) {
                 BigDecimal extraDiscount = subtotal
                         .multiply(BigDecimal.valueOf(referralDiscountPercent))
