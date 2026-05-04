@@ -280,9 +280,14 @@ public class AuthServiceImpl implements AuthService {
 
         log.info("========== VERIFY OTP SUCCESS ==========");
 
+        User finalUser = userRepository
+                .findByEmail(identifier)
+                .or(() -> userRepository.findByContactNumber(identifier))
+                .orElseThrow(() -> new RuntimeException("User not found after OTP"));
+
         return new AuthResponseDTO(
                 token,
-                role.name()
-        );
-    }
+                role.name(),
+                finalUser.getId()
+        );    }
 }
