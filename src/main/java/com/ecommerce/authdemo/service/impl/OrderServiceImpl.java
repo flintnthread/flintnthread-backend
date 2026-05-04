@@ -69,6 +69,35 @@ public class OrderServiceImpl implements OrderService {
             BigDecimal discount = cart.getPriceSummary().getDiscount();
             BigDecimal finalAmount = cart.getPriceSummary().getFinalTotal();
 
+            // ✅ Apply referral discount if applicable
+            boolean referralDiscountApplied = false;
+            double referralDiscountPercent = 0.0d;
+
+            try {
+                long paidOrders = orderRepository.countByUserIdAndPaymentStatus(userId, "paid");
+
+                if (paidOrders == 0) {
+                    BigDecimal discountPercent = referralService
+                            .getAvailableReferralDiscountPercentForUser(userId);
+
+                    referralDiscountPercent = (discountPercent != null)
+                            ? discountPercent.doubleValue()
+                            : 0.0d;
+                }
+
+            } catch (Exception e) {
+                log.warn("[ORDER] referral discount lookup failed userId={}: {}", userId, e.getMessage());
+            }
+
+            if (referralDiscountPercent > 0) {
+                BigDecimal extraDiscount = subtotal
+                        .multiply(BigDecimal.valueOf(referralDiscountPercent))
+                        .divide(BigDecimal.valueOf(100));
+                discount = discount.add(extraDiscount);
+                finalAmount = subtotal.add(shipping).subtract(discount).max(BigDecimal.ZERO);
+                referralDiscountApplied = true;
+            }
+
             Order order = createOrder(userId, dto, address, subtotal, shipping, discount, finalAmount);
             order = orderRepository.save(order);
 

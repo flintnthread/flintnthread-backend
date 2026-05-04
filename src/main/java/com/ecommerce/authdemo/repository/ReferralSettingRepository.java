@@ -5,8 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
-public interface ReferralSettingRepository extends JpaRepository<ReferralSetting, Integer> {
+public interface ReferralSettingRepository extends JpaRepository<ReferralSetting,Integer> {
 
-    Optional<ReferralSetting> findTopByActiveTrueOrderByIdDesc();
+    Optional<ReferralSetting> findBySettingKey(String key);
 }
-

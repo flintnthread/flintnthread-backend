@@ -1,36 +1,25 @@
 package com.ecommerce.authdemo.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
-
-import java.time.LocalDateTime;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
-@Table(name = "referral_settings")
+@Table(name="referral_settings")
 @Getter
 @Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class ReferralSetting {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;
 
-    @Column(name = "required_referrals")
-    private Integer requiredReferrals;
+    @Column(unique = true)
+    private String settingKey;
 
-    @Column(name = "discount_percent")
-    private Double discountPercent;
+    @Column(columnDefinition = "TEXT")
+    private String settingValue;
 
-    @Column(name = "is_active")
-    private Boolean active;
-
-    @Column(name = "created_at", insertable = false, updatable = false)
-    private LocalDateTime createdAt;
-
-    @Column(name = "updated_at", insertable = false, updatable = false)
-    private LocalDateTime updatedAt;
+    @Column(columnDefinition = "TEXT")
+    private String description;
 }
-

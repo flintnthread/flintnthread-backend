@@ -61,7 +61,6 @@ public class CartServiceImpl implements CartService {
             Cart cart = existingCart.get();
             int newQuantity = cart.getQuantity() + dto.getQuantity();
             validateQuantity(newQuantity);
-            validateVariantStockLimit(dto.getVariantId(), newQuantity);
             cart.setQuantity(newQuantity);
             cart.setPrice(productPrice);
             cart.setTotalAmount(productPrice.multiply(BigDecimal.valueOf(newQuantity)));
@@ -71,7 +70,6 @@ public class CartServiceImpl implements CartService {
             cartRepository.save(cart);
             log.info("Updated existing cart item: cartId={}, newQuantity={}", cart.getId(), newQuantity);
         } else {
-            validateVariantStockLimit(dto.getVariantId(), dto.getQuantity());
             Cart newCart = createCart(userId, dto.getProductId(), dto.getVariantId(), dto.getQuantity(), productPrice);
             log.info("Created new cart item: cartId={}", newCart.getId());
         }
@@ -122,12 +120,12 @@ public CartResponseDTO updateQuantity(Long itemId, Integer change) {
         throw new CartException("Only " + stock + " items available in stock");
     }
 
-    // ✅ HANDLE REMOVE
+    // ✅ HANDLE REMOVE OR UPDATE
     if (newQuantity <= 0) {
         cartRepository.delete(cart);
         log.info("Item removed due to zero quantity: itemId={}", itemId);
     } else {
-
+        // ✅ UPDATE QUANTITY
         BigDecimal productPrice = resolveUnitPriceStrict(cart.getProductId(), cart.getVariantId());
 
         cart.setQuantity(newQuantity);
@@ -140,11 +138,13 @@ public CartResponseDTO updateQuantity(Long itemId, Integer change) {
         cart.setFinalAmount(cart.getTotalAmount().subtract(discount).add(shipping));
 
         cartRepository.save(cart);
+        log.info("Updated cart item quantity: itemId={}, newQuantity={}", itemId, newQuantity);
     }
 
     List<Cart> cartItems = cartRepository.findAllByUser_Id(securityUtil.getCurrentUserId());
     return buildCartResponse(cartItems);
 }
+
     @Override
     @Transactional
     public CartResponseDTO removeItem(Long itemId) {

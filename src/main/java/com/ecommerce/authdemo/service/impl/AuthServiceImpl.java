@@ -22,6 +22,7 @@ import com.ecommerce.authdemo.repository.UserRepository;
 import com.ecommerce.authdemo.security.JwtUtil;
 import com.ecommerce.authdemo.service.AuthService;
 import com.ecommerce.authdemo.service.EmailService;
+import com.ecommerce.authdemo.service.ReferralService;
 import com.ecommerce.authdemo.service.SmsService;
 import com.ecommerce.authdemo.util.OtpUtil;
 
@@ -52,11 +53,11 @@ public class AuthServiceImpl implements AuthService {
     private final OtpUtil otpUtil;
     private final SmsService smsService;
     private final EmailService emailService;
+    private final ReferralService referralService;
 
     /* ======================================================
        SEND OTP
     ====================================================== */
-
     @Override
     @Transactional
     public String sendOtp(LoginRequestDTO dto) {
@@ -255,9 +256,14 @@ public class AuthServiceImpl implements AuthService {
                 newUser.setVerified(true);
                 newUser.setRole(Role.USER);
 
-                userRepository.saveAndFlush(newUser);
-            }
-        }
+                User savedUser = userRepository.saveAndFlush(newUser);
+
+                // ✅ Step 2: Generate referral code
+                referralService.generateCodes(
+                        savedUser.getId(),
+                        savedUser.getUsername()
+                );
+            }        }
 
         log.info("Deleting old OTP");
 
@@ -274,9 +280,14 @@ public class AuthServiceImpl implements AuthService {
 
         log.info("========== VERIFY OTP SUCCESS ==========");
 
+        User finalUser = userRepository
+                .findByEmail(identifier)
+                .or(() -> userRepository.findByContactNumber(identifier))
+                .orElseThrow(() -> new RuntimeException("User not found after OTP"));
+
         return new AuthResponseDTO(
                 token,
-                role.name()
-        );
-    }
+                role.name(),
+                finalUser.getId()
+        );    }
 }

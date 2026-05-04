@@ -1,19 +1,28 @@
 package com.ecommerce.authdemo.service;
 
-import com.ecommerce.authdemo.dto.ReferralOverviewDTO;
+import com.ecommerce.authdemo.dto.ReferralDashboardDto;
+import com.ecommerce.authdemo.dto.ReferralResponse;
+import com.ecommerce.authdemo.dto.ShareDto;
+
+import java.math.BigDecimal;
 
 public interface ReferralService {
 
-    void giveSignupBonus(Integer referrerId, Integer newUserId);
+    void generateCodes(Long userId, String username);
 
-    ReferralOverviewDTO getMyReferralOverview();
+    ReferralResponse applyReferral(Long userId, String referralCode);
 
-    ReferralOverviewDTO applyReferralCode(String referralCode);
+    BigDecimal calculateFirstOrderDiscount(Long userId, BigDecimal subtotal);
 
-    void confirmReferralOnFirstPaidOrder(Long referredUserId);
+    ReferralDashboardDto getDashboard(Long userId);
 
-    double getAvailableReferralDiscountPercentForUser(Long userId);
+    String refreshReferralCode(Long userId);
+
+    ShareDto getShareData(Long userId);
 
     void markReferralDiscountUsed(Long userId, Long orderId);
-}
 
+    void confirmReferralOnFirstPaidOrder(Long userId);
+
+    BigDecimal getAvailableReferralDiscountPercentForUser(Long userId);
+}

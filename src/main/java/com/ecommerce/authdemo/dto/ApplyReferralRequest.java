@@ -5,9 +5,8 @@ import lombok.Setter;
 
 @Getter
 @Setter
-public class ApplyReferralCodeRequest {
+public class ApplyReferralRequest {
 
-    private Integer userId;
+    private Long userId;
     private String referralCode;
 }
-
