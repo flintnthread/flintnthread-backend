@@ -10,9 +10,13 @@ public class AuthResponseDTO {
 
         private String role;
 
-        public AuthResponseDTO(String token, String role) {
+        private Long userId;
+
+        public AuthResponseDTO(String token, String role, Long userId) {
             this.token = token;
             this.role = role;
+            this.userId = userId;
+
         }
 
         // getters setters
